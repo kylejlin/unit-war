@@ -55,11 +55,11 @@ class Network {
   private readonly outputBiases: Float64Array;
   private readonly outputActivations: Float64Array;
 
-  private readonly originalHiddenWeights: Float64Array;
-  private readonly originalHiddenBiases: Float64Array;
+  private readonly updatedHiddenWeights: Float64Array;
+  private readonly updatedHiddenBiases: Float64Array;
 
-  private readonly originalOutputWeights: Float64Array;
-  private readonly originalOutputBiases: Float64Array;
+  private readonly updatedOutputWeights: Float64Array;
+  private readonly updatedOutputBiases: Float64Array;
 
   static fromLayerSizes(
     inputSize: number,
@@ -137,7 +137,7 @@ class Network {
       outputActivationsSize
     );
 
-    this.originalHiddenWeights = new Float64Array(
+    this.updatedHiddenWeights = new Float64Array(
       buffer,
       Float64Array.BYTES_PER_ELEMENT *
         (hiddenWeightsSize +
@@ -148,7 +148,7 @@ class Network {
           outputActivationsSize),
       hiddenWeightsSize
     );
-    this.originalHiddenBiases = new Float64Array(
+    this.updatedHiddenBiases = new Float64Array(
       buffer,
       Float64Array.BYTES_PER_ELEMENT *
         (hiddenWeightsSize +
@@ -161,7 +161,7 @@ class Network {
       hiddenBiasesSize
     );
 
-    this.originalOutputWeights = new Float64Array(
+    this.updatedOutputWeights = new Float64Array(
       buffer,
       Float64Array.BYTES_PER_ELEMENT *
         (hiddenWeightsSize +
@@ -174,7 +174,7 @@ class Network {
           hiddenBiasesSize),
       outputWeightsSize
     );
-    this.originalOutputBiases = new Float64Array(
+    this.updatedOutputBiases = new Float64Array(
       buffer,
       Float64Array.BYTES_PER_ELEMENT *
         (hiddenWeightsSize +
@@ -249,10 +249,14 @@ class Network {
 
     const {
       hiddenWeights,
+      updatedHiddenWeights,
       hiddenBiases,
+      updatedHiddenBiases,
 
       outputWeights,
+      updatedOutputWeights,
       outputBiases,
+      updatedOutputBiases,
     } = this;
 
     const { derivativeStep, learningRate } = options;
@@ -263,7 +267,8 @@ class Network {
       hiddenWeights[i] += derivativeStep;
       const evaluation = evaluate(containingAgent, opponent, evaluationOptions);
       const derivative = (evaluation - baseline) / derivativeStep;
-      hiddenWeights[i] = originalWeight + derivative * learningRate;
+      updatedHiddenWeights[i] = originalWeight + derivative * learningRate;
+      hiddenWeights[i] = originalWeight;
     }
 
     const numberOfHiddenBiases = hiddenBiases.length;
@@ -272,7 +277,8 @@ class Network {
       hiddenBiases[i] += derivativeStep;
       const evaluation = evaluate(containingAgent, opponent, evaluationOptions);
       const derivative = (evaluation - baseline) / derivativeStep;
-      hiddenBiases[i] = originalBias + derivative * learningRate;
+      updatedHiddenBiases[i] = originalBias + derivative * learningRate;
+      hiddenBiases[i] = originalBias;
     }
 
     const numberOfOutputWeights = outputWeights.length;
@@ -281,7 +287,8 @@ class Network {
       outputWeights[i] += derivativeStep;
       const evaluation = evaluate(containingAgent, opponent, evaluationOptions);
       const derivative = (evaluation - baseline) / derivativeStep;
-      outputWeights[i] = originalWeight + derivative * learningRate;
+      updatedOutputWeights[i] = originalWeight + derivative * learningRate;
+      outputWeights[i] = originalWeight;
     }
 
     const numberOfOutputBiases = outputBiases.length;
@@ -290,8 +297,14 @@ class Network {
       outputBiases[i] += derivativeStep;
       const evaluation = evaluate(containingAgent, opponent, evaluationOptions);
       const derivative = (evaluation - baseline) / derivativeStep;
-      outputBiases[i] = originalBias + derivative * learningRate;
+      updatedOutputBiases[i] = originalBias + derivative * learningRate;
+      outputBiases[i] = originalBias;
     }
+
+    hiddenWeights.set(updatedHiddenWeights);
+    hiddenBiases.set(updatedHiddenBiases);
+    outputWeights.set(updatedOutputWeights);
+    outputBiases.set(updatedOutputBiases);
   }
 }
 
