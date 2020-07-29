@@ -1,22 +1,36 @@
+import { AgentUids } from ".";
 import { evaluate } from "../game/evaluate";
 import { Agent, TrainableAgent, TrainingOptions } from "../game/types";
 import { normalRandom } from "../random";
 import { ReadonlyFloat64Array } from "../readonly/readonlyFloat64Array";
 
-export class AgentAlpha implements TrainableAgent {
-  private readonly leaderNetwork: Network;
-  private readonly followerNetwork: Network;
-
+export class AgentArtichoke implements TrainableAgent {
   private readonly inputs: Float64Array;
 
-  static fromHiddenLayerSize(hiddenSize: number): TrainableAgent {
-    return new AgentAlpha(hiddenSize);
+  private constructor(
+    private readonly leaderNetwork: Network,
+    private readonly followerNetwork: Network
+  ) {
+    this.inputs = new Float64Array(3);
   }
 
-  private constructor(hiddenSize: number) {
-    this.leaderNetwork = Network.fromLayerSizes(2, hiddenSize, 2);
-    this.followerNetwork = Network.fromLayerSizes(3, hiddenSize, 1);
-    this.inputs = new Float64Array(3);
+  static fromHiddenLayerSize(hiddenSize: number): TrainableAgent {
+    const leaderNetwork = Network.fromLayerSizes(2, hiddenSize, 2);
+    const followerNetwork = Network.fromLayerSizes(3, hiddenSize, 1);
+    return new AgentArtichoke(leaderNetwork, followerNetwork);
+  }
+
+  static fromArrayBuffer(buffer: ArrayBuffer): TrainableAgent {
+    const floats = new Float64Array(buffer);
+    const leaderSize = floats[1];
+    const followerSize = floats[2];
+    const leaderNetwork = Network.fromArrayBuffer(
+      floats.slice(3, 3 + leaderSize).buffer
+    );
+    const followerNetwork = Network.fromArrayBuffer(
+      floats.slice(3 + leaderSize, 3 + leaderSize + followerSize).buffer
+    );
+    return new AgentArtichoke(leaderNetwork, followerNetwork);
   }
 
   lead(strength: number, noise: number): ReadonlyFloat64Array {
@@ -37,6 +51,24 @@ export class AgentAlpha implements TrainableAgent {
   train(opponent: Agent, options: TrainingOptions): void {
     this.leaderNetwork.train(this, opponent, options);
     this.followerNetwork.train(this, opponent, options);
+  }
+
+  toArrayBuffer(): ArrayBuffer {
+    const leaderFloats = new Float64Array(this.leaderNetwork.toArrayBuffer());
+    const followerFloats = new Float64Array(
+      this.followerNetwork.toArrayBuffer()
+    );
+    const out = new Float64Array(
+      3 + leaderFloats.length + followerFloats.length
+    );
+
+    out[0] = AgentUids.Artichoke;
+    out[1] = leaderFloats.length;
+    out[2] = followerFloats.length;
+    out.set(leaderFloats, 3);
+    out.set(followerFloats, 3 + leaderFloats.length);
+
+    return out.buffer;
   }
 }
 
@@ -67,6 +99,47 @@ class Network {
     outputSize: number
   ): Network {
     return new Network(inputSize, hiddenSize, outputSize);
+  }
+
+  static fromArrayBuffer(buffer: ArrayBuffer): Network {
+    const floats = new Float64Array(buffer);
+
+    const inputSize = floats[0];
+    const hiddenSize = floats[1];
+    const outputSize = floats[2];
+
+    const hiddenWeightsSize = hiddenSize * inputSize;
+    const hiddenBiasesSize = hiddenSize;
+
+    const hiddenWeights = floats.subarray(3, 3 + hiddenWeightsSize);
+    const hiddenBiases = floats.subarray(
+      3 + hiddenWeightsSize,
+      3 + hiddenWeightsSize + hiddenBiasesSize
+    );
+
+    const outputWeightsSize = outputSize * hiddenSize;
+    const outputBiasesSize = outputSize;
+
+    const outputWeights = floats.subarray(
+      3 + hiddenWeightsSize + hiddenBiasesSize,
+      3 + hiddenWeightsSize + hiddenBiasesSize + outputWeightsSize
+    );
+    const outputBiases = floats.subarray(
+      3 + hiddenWeightsSize + hiddenBiasesSize + outputWeightsSize,
+      3 +
+        hiddenWeightsSize +
+        hiddenBiasesSize +
+        outputWeightsSize +
+        outputBiasesSize
+    );
+
+    const network = new Network(inputSize, hiddenSize, outputSize);
+    network.hiddenWeights.set(hiddenWeights);
+    network.hiddenBiases.set(hiddenBiases);
+    network.outputWeights.set(outputWeights);
+    network.outputBiases.set(outputBiases);
+
+    return network;
   }
 
   private constructor(
@@ -305,6 +378,43 @@ class Network {
     hiddenBiases.set(updatedHiddenBiases);
     outputWeights.set(updatedOutputWeights);
     outputBiases.set(updatedOutputBiases);
+  }
+
+  toArrayBuffer(): ArrayBuffer {
+    const {
+      inputSize,
+      hiddenSize,
+      outputSize,
+
+      hiddenWeights,
+      hiddenBiases,
+
+      outputWeights,
+      outputBiases,
+    } = this;
+
+    const floats = new Float64Array(
+      3 +
+        hiddenWeights.length +
+        hiddenBiases.length +
+        outputWeights.length +
+        outputBiases.length
+    );
+
+    floats[0] = inputSize;
+    floats[1] = hiddenSize;
+    floats[2] = outputSize;
+
+    floats.set(hiddenWeights, 3);
+    floats.set(hiddenBiases, 3 + hiddenWeights.length);
+
+    floats.set(outputWeights, 3 + hiddenWeights.length + hiddenBiases.length);
+    floats.set(
+      outputBiases,
+      3 + hiddenWeights.length + hiddenBiases.length + outputWeights.length
+    );
+
+    return floats.buffer;
   }
 }
 

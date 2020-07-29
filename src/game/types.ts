@@ -18,6 +18,8 @@ export interface Agent {
    * or equal to `1`.
    */
   follow: (strength: number, initialBid: number, noise: number) => number;
+
+  toArrayBuffer(): ArrayBuffer;
 }
 
 export interface TrainableAgent extends Agent {
