@@ -41,6 +41,8 @@ export class AgentAlpha implements TrainableAgent {
 }
 
 class Network {
+  private readonly buffer: ArrayBuffer;
+
   private readonly inputSize: number;
   private readonly hiddenSize: number;
   private readonly outputSize: number;
@@ -52,6 +54,12 @@ class Network {
   private readonly outputWeights: Float64Array;
   private readonly outputBiases: Float64Array;
   private readonly outputActivations: Float64Array;
+
+  private readonly originalHiddenWeights: Float64Array;
+  private readonly originalHiddenBiases: Float64Array;
+
+  private readonly originalOutputWeights: Float64Array;
+  private readonly originalOutputBiases: Float64Array;
 
   static fromLayerSizes(
     inputSize: number,
@@ -66,17 +74,120 @@ class Network {
     hiddenSize: number,
     outputSize: number
   ) {
+    const hiddenWeightsSize = hiddenSize * inputSize;
+    const hiddenBiasesSize = hiddenSize;
+    const hiddenActivationsSize = hiddenSize;
+    const outputWeightsSize = outputSize * hiddenSize;
+    const outputBiasesSize = outputSize;
+    const outputActivationsSize = outputSize;
+    const buffer = new ArrayBuffer(
+      Float64Array.BYTES_PER_ELEMENT *
+        (hiddenWeightsSize +
+          hiddenBiasesSize +
+          hiddenActivationsSize +
+          outputWeightsSize +
+          outputBiasesSize +
+          outputActivationsSize +
+          hiddenWeightsSize +
+          hiddenBiasesSize +
+          outputWeightsSize +
+          outputBiasesSize)
+    );
+    this.buffer = buffer;
+
     this.inputSize = inputSize;
     this.hiddenSize = hiddenSize;
     this.outputSize = outputSize;
 
-    this.hiddenWeights = new Float64Array(hiddenSize * inputSize);
-    this.hiddenBiases = new Float64Array(hiddenSize);
-    this.hiddenActivations = new Float64Array(hiddenSize);
+    this.hiddenWeights = new Float64Array(buffer, 0, hiddenWeightsSize);
+    this.hiddenBiases = new Float64Array(
+      buffer,
+      Float64Array.BYTES_PER_ELEMENT * hiddenWeightsSize,
+      hiddenBiasesSize
+    );
+    this.hiddenActivations = new Float64Array(
+      buffer,
+      Float64Array.BYTES_PER_ELEMENT * (hiddenWeightsSize + hiddenBiasesSize),
+      hiddenActivationsSize
+    );
 
-    this.outputWeights = new Float64Array(outputSize * hiddenSize);
-    this.outputBiases = new Float64Array(outputSize);
-    this.outputActivations = new Float64Array(outputSize);
+    this.outputWeights = new Float64Array(
+      buffer,
+      Float64Array.BYTES_PER_ELEMENT *
+        (hiddenWeightsSize + hiddenBiasesSize + hiddenActivationsSize),
+      outputWeightsSize
+    );
+    this.outputBiases = new Float64Array(
+      buffer,
+      Float64Array.BYTES_PER_ELEMENT *
+        (hiddenWeightsSize +
+          hiddenBiasesSize +
+          hiddenActivationsSize +
+          outputWeightsSize),
+      outputBiasesSize
+    );
+    this.outputActivations = new Float64Array(
+      buffer,
+      Float64Array.BYTES_PER_ELEMENT *
+        (hiddenWeightsSize +
+          hiddenBiasesSize +
+          hiddenActivationsSize +
+          outputWeightsSize +
+          outputBiasesSize),
+      outputActivationsSize
+    );
+
+    this.originalHiddenWeights = new Float64Array(
+      buffer,
+      Float64Array.BYTES_PER_ELEMENT *
+        (hiddenWeightsSize +
+          hiddenBiasesSize +
+          hiddenActivationsSize +
+          outputWeightsSize +
+          outputBiasesSize +
+          outputActivationsSize),
+      hiddenWeightsSize
+    );
+    this.originalHiddenBiases = new Float64Array(
+      buffer,
+      Float64Array.BYTES_PER_ELEMENT *
+        (hiddenWeightsSize +
+          hiddenBiasesSize +
+          hiddenActivationsSize +
+          outputWeightsSize +
+          outputBiasesSize +
+          outputActivationsSize +
+          hiddenWeightsSize),
+      hiddenBiasesSize
+    );
+
+    this.originalOutputWeights = new Float64Array(
+      buffer,
+      Float64Array.BYTES_PER_ELEMENT *
+        (hiddenWeightsSize +
+          hiddenBiasesSize +
+          hiddenActivationsSize +
+          outputWeightsSize +
+          outputBiasesSize +
+          outputActivationsSize +
+          hiddenWeightsSize +
+          hiddenBiasesSize),
+      outputWeightsSize
+    );
+    this.originalOutputBiases = new Float64Array(
+      buffer,
+      Float64Array.BYTES_PER_ELEMENT *
+        (hiddenWeightsSize +
+          hiddenBiasesSize +
+          hiddenActivationsSize +
+          outputWeightsSize +
+          outputBiasesSize +
+          outputActivationsSize +
+          hiddenWeightsSize +
+          hiddenBiasesSize +
+          outputWeightsSize),
+      outputBiasesSize
+    );
 
     this.initializeWeights();
   }
