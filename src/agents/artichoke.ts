@@ -1,6 +1,6 @@
-import { AgentUids } from ".";
+import { AgentTypes } from ".";
 import { evaluate } from "../game/evaluate";
-import { Agent, TrainableAgent, TrainingOptions } from "../game/types";
+import { Agent, TrainableAgent, TrainingCycleOptions } from "../game/types";
 import { normalRandom } from "../random";
 import { ReadonlyFloat64Array } from "../readonly/readonlyFloat64Array";
 
@@ -48,7 +48,7 @@ export class AgentArtichoke implements TrainableAgent {
     return this.followerNetwork.evaluate(inputs)[0];
   }
 
-  train(opponent: Agent, options: TrainingOptions): void {
+  train(opponent: Agent, options: TrainingCycleOptions): void {
     this.leaderNetwork.train(this, opponent, options);
     this.followerNetwork.train(this, opponent, options);
   }
@@ -62,7 +62,7 @@ export class AgentArtichoke implements TrainableAgent {
       3 + leaderFloats.length + followerFloats.length
     );
 
-    out[0] = AgentUids.Artichoke;
+    out[0] = AgentTypes.Artichoke;
     out[1] = leaderFloats.length;
     out[2] = followerFloats.length;
     out.set(leaderFloats, 3);
@@ -315,7 +315,7 @@ class Network {
   train(
     containingAgent: Agent,
     opponent: Agent,
-    options: TrainingOptions
+    options: TrainingCycleOptions
   ): void {
     const { evaluationOptions } = options;
     const baseline = evaluate(containingAgent, opponent, evaluationOptions);

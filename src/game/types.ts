@@ -23,10 +23,10 @@ export interface Agent {
 }
 
 export interface TrainableAgent extends Agent {
-  train: (opponent: Agent, options: TrainingOptions) => void;
+  train: (opponent: Agent, options: TrainingCycleOptions) => void;
 }
 
-export interface TrainingOptions {
+export interface TrainingCycleOptions {
   derivativeStep: number;
   learningRate: number;
   evaluationOptions: EvaluationOptions;

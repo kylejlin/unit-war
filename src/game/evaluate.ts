@@ -21,36 +21,36 @@ export function evaluate(
     }
   }
 
-  return aTotal - bTotal;
+  return (aTotal - bTotal) / 2;
 }
 
 function getLeaderReward(leader: Agent, follower: Agent, ante: number): number {
   const leaderStrength = Math.random();
   const leaderNoise = Math.random();
   const leaderOutput = leader.lead(leaderStrength, leaderNoise);
-  const initialBid = Math.max(ante, leaderOutput[0]);
-  const maxBid = Math.max(initialBid, leaderOutput[1]);
+  const initialBet = Math.max(ante, leaderOutput[0]);
+  const maxBet = Math.max(initialBet, leaderOutput[1]);
 
   const followerStrength = Math.random();
   const followerNoise = Math.random();
-  const followBid = Math.max(
+  const followingBet = Math.max(
     ante,
-    follower.follow(followerStrength, initialBid, followerNoise)
+    follower.follow(followerStrength, initialBet, followerNoise)
   );
 
-  if (followBid < initialBid) {
+  if (followingBet < initialBet) {
     return ante;
   }
 
-  if (followBid > maxBid) {
-    return -initialBid;
+  if (followingBet > maxBet) {
+    return -initialBet;
   }
 
   if (leaderStrength > followerStrength) {
-    return followBid;
+    return followingBet;
   }
   if (leaderStrength < followerStrength) {
-    return -followBid;
+    return -followingBet;
   }
   return 0;
 }
