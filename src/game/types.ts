@@ -1,6 +1,9 @@
+import { AgentType } from "../agents";
 import { ReadonlyFloat64Array } from "../readonly/readonlyFloat64Array";
 
 export interface Agent {
+  readonly agentType: AgentType;
+
   /**
    * Returns a `Float64Array` containing the
    * initial bid (at index `0`) and the max

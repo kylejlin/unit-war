@@ -1,16 +1,19 @@
-import { AgentTypes } from ".";
+import { AgentType } from ".";
 import { evaluate } from "../game/evaluate";
 import { Agent, TrainableAgent, TrainingCycleOptions } from "../game/types";
 import { normalRandom } from "../random";
 import { ReadonlyFloat64Array } from "../readonly/readonlyFloat64Array";
 
 export class AgentArtichoke implements TrainableAgent {
+  readonly agentType: AgentType.Artichoke;
+
   private readonly inputs: Float64Array;
 
   private constructor(
     private readonly leaderNetwork: Network,
     private readonly followerNetwork: Network
   ) {
+    this.agentType = AgentType.Artichoke;
     this.inputs = new Float64Array(3);
   }
 
@@ -62,7 +65,7 @@ export class AgentArtichoke implements TrainableAgent {
       3 + leaderFloats.length + followerFloats.length
     );
 
-    out[0] = AgentTypes.Artichoke;
+    out[0] = this.agentType;
     out[1] = leaderFloats.length;
     out[2] = followerFloats.length;
     out.set(leaderFloats, 3);
