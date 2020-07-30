@@ -1,8 +1,19 @@
 import { AgentType } from ".";
 import { evaluate } from "../game/evaluate";
 import { Agent, TrainableAgent, TrainingCycleOptions } from "../game/types";
+import { isPositiveInteger } from "../numberValidation";
 import { normalRandom } from "../random";
 import { ReadonlyFloat64Array } from "../readonly/readonlyFloat64Array";
+
+export interface ArtichokeCreationOptions {
+  hiddenLayerSize: number;
+}
+
+export function areArtichokeCreationOptionsValid(
+  options: ArtichokeCreationOptions
+): boolean {
+  return isPositiveInteger(options.hiddenLayerSize);
+}
 
 export class AgentArtichoke implements TrainableAgent {
   readonly agentType: AgentType.Artichoke;
@@ -15,6 +26,12 @@ export class AgentArtichoke implements TrainableAgent {
   ) {
     this.agentType = AgentType.Artichoke;
     this.inputs = new Float64Array(3);
+  }
+
+  static fromCreationOptions(
+    options: ArtichokeCreationOptions
+  ): TrainableAgent {
+    return AgentArtichoke.fromHiddenLayerSize(options.hiddenLayerSize);
   }
 
   static fromHiddenLayerSize(hiddenSize: number): TrainableAgent {

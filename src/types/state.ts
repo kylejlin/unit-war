@@ -1,8 +1,10 @@
+import { AgentCreationOptions, AgentType } from "../agents";
 import { Agent, TrainingCycleOptions } from "../game/types";
 
 export type AppState =
   | AgentListState
   | OptionsState
+  | AgentCreationState
   | EvaluationState
   | TrainingAgentSelectionState
   | TrainingState
@@ -12,6 +14,7 @@ export type AppState =
 export enum StateType {
   AgentList,
   Options,
+  AgentCreation,
   Evaluation,
   TrainingAgentSelection,
   Training,
@@ -22,6 +25,7 @@ export enum StateType {
 export interface StateMap {
   [StateType.AgentList]: AgentListState;
   [StateType.Options]: OptionsState;
+  [StateType.AgentCreation]: AgentCreationState;
   [StateType.Evaluation]: EvaluationState;
   [StateType.TrainingAgentSelection]: TrainingAgentSelectionState;
   [StateType.Training]: TrainingState;
@@ -70,6 +74,21 @@ export interface AppOptionInputValues {
     };
   };
 }
+
+export interface AgentCreationState {
+  stateType: StateType.AgentCreation;
+
+  agents: NamedAgent[];
+  options: AppOptions;
+
+  agentType: AgentType;
+  agentCreationOptionInputValues: WithStringValues<AgentCreationOptions>;
+  agentName: string;
+}
+
+export type WithStringValues<T> = { [key in keyof T]: string };
+
+export type WithNumberValues<T> = { [key in keyof T]: number };
 
 export interface EvaluationState {
   stateType: StateType.Evaluation;

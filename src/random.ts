@@ -14,3 +14,16 @@ export function normalRandom(mean: number = 0, variance: number = 1): number {
   const z1 = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
   return variance * z1 + mean;
 }
+
+export function shuffle(arr: unknown[]): void {
+  for (let i = arr.length - 1; i >= 1; i--) {
+    let j = randIntFromZeroToN(i + 1);
+    const temp = arr[i];
+    arr[i] = arr[j];
+    arr[j] = temp;
+  }
+}
+
+function randIntFromZeroToN(exclMax: number): number {
+  return Math.floor(Math.random() * exclMax);
+}

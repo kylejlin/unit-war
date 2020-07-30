@@ -1,17 +1,28 @@
 import React from "react";
-import { getAgentTypeDisplayString } from "./agents";
+import {
+  AgentCreationOptions,
+  AgentType,
+  ALL_AGENT_TYPES,
+  areAgentCreationOptionsValid,
+  createAgent,
+  getAgentTypeDisplayString,
+  getDefaultAgentCreationOptions,
+} from "./agents";
+import { ArtichokeCreationOptions } from "./agents/artichoke";
 import "./App.css";
 import {
   isOnInclusiveUnitInterval,
   isPositiveFiniteNumber,
   isPositiveInteger,
 } from "./numberValidation";
-import { getSavedAgents } from "./stateSavers/agentsSaver";
+import { shuffle } from "./random";
+import * as agentsSaver from "./stateSavers/agentsSaver";
 import {
   getSavedAppOptions,
   saveAppOptions,
 } from "./stateSavers/appOptionsSaver";
 import {
+  AgentCreationState,
   AgentListState,
   AppOptionInputValues,
   AppOptions,
@@ -25,6 +36,8 @@ import {
   StateType,
   TrainingAgentSelectionState,
   TrainingState,
+  WithNumberValues,
+  WithStringValues,
 } from "./types/state";
 
 export default class App extends React.Component<{}, AppState> {
@@ -38,6 +51,7 @@ export default class App extends React.Component<{}, AppState> {
 
   bindMethods(): void {
     this.onOptionsClick = this.onOptionsClick.bind(this);
+    this.onCreateAgentClick = this.onCreateAgentClick.bind(this);
     this.onEvaluateClick = this.onEvaluateClick.bind(this);
     this.onTrainClick = this.onTrainClick.bind(this);
     this.onPlayClick = this.onPlayClick.bind(this);
@@ -60,6 +74,10 @@ export default class App extends React.Component<{}, AppState> {
       this
     );
     this.onUseMainThreadChange = this.onUseMainThreadChange.bind(this);
+
+    this.onAgentNameChange = this.onAgentNameChange.bind(this);
+    this.onAgentTypeChange = this.onAgentTypeChange.bind(this);
+    this.onConfirmCreationClick = this.onConfirmCreationClick.bind(this);
   }
 
   expectState<T extends StateType>(expectedType: T): StateMap[T] {
@@ -84,6 +102,8 @@ export default class App extends React.Component<{}, AppState> {
         return this.renderAgentList(state);
       case StateType.Options:
         return this.renderOptionsMenu(state);
+      case StateType.AgentCreation:
+        return this.renderAgentCreationMenu(state);
       case StateType.Evaluation:
         return this.renderEvaluationMenu(state);
       case StateType.TrainingAgentSelection:
@@ -118,10 +138,19 @@ export default class App extends React.Component<{}, AppState> {
 
         <section>
           <button onClick={this.onOptionsClick}>Options</button>
-          <button onClick={this.onEvaluateClick}>Evaluate</button>
-          <button onClick={this.onTrainClick}>Train</button>
-          <button onClick={this.onPlayClick}>Play</button>
-          <button onClick={this.onGraphClick}>Graph</button>
+          <button onClick={this.onCreateAgentClick}>Create agent</button>
+          <button disabled={agents.length === 0} onClick={this.onEvaluateClick}>
+            Evaluate
+          </button>
+          <button disabled={agents.length === 0} onClick={this.onTrainClick}>
+            Train
+          </button>
+          <button disabled={agents.length === 0} onClick={this.onPlayClick}>
+            Play
+          </button>
+          <button disabled={agents.length === 0} onClick={this.onGraphClick}>
+            Graph
+          </button>
         </section>
       </div>
     );
@@ -144,7 +173,7 @@ export default class App extends React.Component<{}, AppState> {
               className={
                 isPositiveInteger(+inputValues.trainingCycles)
                   ? ""
-                  : "OptionInput--invalid"
+                  : "InvalidInput"
               }
               type="text"
               value={inputValues.trainingCycles}
@@ -159,7 +188,7 @@ export default class App extends React.Component<{}, AppState> {
                   +inputValues.trainingCycleOptions.derivativeStep
                 )
                   ? ""
-                  : "OptionInput--invalid"
+                  : "InvalidInput"
               }
               type="text"
               value={inputValues.trainingCycleOptions.derivativeStep}
@@ -174,7 +203,7 @@ export default class App extends React.Component<{}, AppState> {
                   +inputValues.trainingCycleOptions.learningRate
                 )
                   ? ""
-                  : "OptionInput--invalid"
+                  : "InvalidInput"
               }
               type="text"
               value={inputValues.trainingCycleOptions.learningRate}
@@ -193,7 +222,7 @@ export default class App extends React.Component<{}, AppState> {
                   +inputValues.trainingCycleOptions.evaluationOptions.hands
                 )
                   ? ""
-                  : "OptionInput--invalid"
+                  : "InvalidInput"
               }
               type="text"
               value={inputValues.trainingCycleOptions.evaluationOptions.hands}
@@ -208,7 +237,7 @@ export default class App extends React.Component<{}, AppState> {
                   +inputValues.trainingCycleOptions.evaluationOptions.ante
                 )
                   ? ""
-                  : "OptionInput--invalid"
+                  : "InvalidInput"
               }
               type="text"
               value={inputValues.trainingCycleOptions.evaluationOptions.ante}
@@ -232,7 +261,128 @@ export default class App extends React.Component<{}, AppState> {
     );
   }
 
+  renderAgentCreationMenu(state: AgentCreationState): React.ReactElement {
+    const isAgentNameValid =
+      state.agents.every(({ name }) => name !== state.agentName) &&
+      /^[\w.\-,/()=]+(?:\s*[\w.\-,/()=]+)*$/.test(state.agentName);
+
+    return (
+      <div className="App">
+        <section>
+          <button onClick={this.onAgentListClick}>Back</button>
+          <h2>Create agent</h2>
+        </section>
+
+        <section>
+          <label>
+            Agent name:{" "}
+            <input
+              className={isAgentNameValid ? "" : "InvalidInput"}
+              type="text"
+              value={state.agentName}
+              onChange={this.onAgentNameChange}
+            />
+          </label>
+
+          <label>
+            Agent type:{" "}
+            <select value={state.agentType} onChange={this.onAgentTypeChange}>
+              {ALL_AGENT_TYPES.map((agentType) => (
+                <option key={agentType} value={agentType}>
+                  {getAgentTypeDisplayString(agentType)}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {this.renderAgentParams(state)}
+
+          <button
+            disabled={
+              !(
+                isAgentNameValid &&
+                areAgentCreationOptionsValid(
+                  state.agentType,
+                  withPropertyValuesParsedAsNumbers(
+                    state.agentCreationOptionInputValues
+                  )
+                )
+              )
+            }
+            onClick={this.onConfirmCreationClick}
+          >
+            Create
+          </button>
+        </section>
+      </div>
+    );
+  }
+
+  renderAgentParams(state: AgentCreationState): React.ReactElement {
+    const inputValues: WithStringValues<ArtichokeCreationOptions> =
+      state.agentCreationOptionInputValues;
+    switch (state.agentType) {
+      case AgentType.Artichoke:
+        return (
+          <section>
+            <h3>Agent options</h3>
+            <label>
+              Hidden neurons:{" "}
+              <input
+                className={
+                  isPositiveInteger(+inputValues.hiddenLayerSize)
+                    ? ""
+                    : "InvalidInput"
+                }
+                type="text"
+                value={state.agentCreationOptionInputValues.hiddenLayerSize}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  this.changeAgentCreationOptionInputValue(
+                    "hiddenLayerSize",
+                    event.target.value
+                  )
+                }
+              />
+            </label>
+          </section>
+        );
+    }
+  }
+
   renderEvaluationMenu(state: EvaluationState): React.ReactElement {
+    if (!state.hasStartedEvaluation) {
+      return this.renderEvaluationAgentSelectionMenu(state);
+    } else {
+      if (state.firstAgentReward === undefined) {
+        return this.renderEvaluationPendingMenu(state);
+      } else {
+        return this.renderEvaluationCompleteMenu(state);
+      }
+    }
+  }
+
+  renderEvaluationAgentSelectionMenu(
+    state: EvaluationState
+  ): React.ReactElement {
+    return (
+      <div className="App">
+        <section>
+          <button onClick={this.onAgentListClick}>Back</button>
+          <h2>Evaluate</h2>
+        </section>
+        <section>
+          Evaluate <select></select> against <select></select>
+          <button>Start</button>
+        </section>
+      </div>
+    );
+  }
+
+  renderEvaluationPendingMenu(state: EvaluationState): React.ReactElement {
+    return <div className="App"></div>;
+  }
+
+  renderEvaluationCompleteMenu(state: EvaluationState): React.ReactElement {
     return <div className="App"></div>;
   }
 
@@ -263,6 +413,23 @@ export default class App extends React.Component<{}, AppState> {
       options: state.options,
 
       inputValues: getInputValuesForAppOptions(state.options),
+    };
+    this.setState(newState);
+  }
+
+  onCreateAgentClick(): void {
+    const state = this.expectState(StateType.AgentList);
+    const newState: AgentCreationState = {
+      stateType: StateType.AgentCreation,
+
+      agents: state.agents,
+      options: state.options,
+
+      agentType: AgentType.Artichoke,
+      agentCreationOptionInputValues: withPropertyValuesStringified(
+        getDefaultAgentCreationOptions(AgentType.Artichoke)
+      ),
+      agentName: getUnusedAgentName(state.agents.map(({ name }) => name)),
     };
     this.setState(newState);
   }
@@ -472,10 +639,72 @@ export default class App extends React.Component<{}, AppState> {
     const newState: OptionsState = { ...state, options };
     this.setState(newState);
   }
+
+  onAgentNameChange(event: React.ChangeEvent<HTMLInputElement>): void {
+    const state = this.expectState(StateType.AgentCreation);
+    const newState: AgentCreationState = {
+      ...state,
+      agentName: event.target.value,
+    };
+    this.setState(newState);
+  }
+
+  onAgentTypeChange(event: React.ChangeEvent<HTMLSelectElement>): void {
+    const state = this.expectState(StateType.AgentCreation);
+    const agentType: AgentType = +event.target.value;
+
+    if (!(agentType in AgentType)) {
+      throw new Error("Unrecognized AgentType: " + agentType);
+    }
+
+    const newState: AgentCreationState = {
+      ...state,
+      agentType,
+      agentCreationOptionInputValues: withPropertyValuesStringified(
+        getDefaultAgentCreationOptions(agentType)
+      ),
+    };
+    this.setState(newState);
+  }
+
+  changeAgentCreationOptionInputValue(
+    optionName: keyof AgentCreationOptions,
+    value: string
+  ): void {
+    const state = this.expectState(StateType.AgentCreation);
+    const newState: AgentCreationState = {
+      ...state,
+      agentCreationOptionInputValues: {
+        ...state.agentCreationOptionInputValues,
+        [optionName]: value,
+      },
+    };
+    this.setState(newState);
+  }
+
+  onConfirmCreationClick(): void {
+    const state = this.expectState(StateType.AgentCreation);
+    const newAgent = {
+      name: state.agentName,
+      agent: createAgent(
+        state.agentType,
+        withPropertyValuesParsedAsNumbers(state.agentCreationOptionInputValues)
+      ),
+    };
+    agentsSaver.addAgent(newAgent);
+
+    const newState: AgentListState = {
+      stateType: StateType.AgentList,
+
+      agents: state.agents.concat([newAgent]),
+      options: state.options,
+    };
+    this.setState(newState);
+  }
 }
 
 function getInitialState(): AppState {
-  const agents = getSavedAgents() ?? [];
+  const agents = agentsSaver.getSavedAgents() ?? [];
   const options = getSavedAppOptions() ?? getDefaultAppOptions();
   return {
     stateType: StateType.AgentList,
@@ -546,4 +775,61 @@ function getInputValuesForAppOptions(
       },
     },
   };
+}
+
+function getUnusedAgentName(names: readonly string[]): string {
+  const ideas = [
+    "Ant",
+    "Alligator",
+    "Aardvark",
+    "Bison",
+    "Boar",
+    "Boa",
+    "Cougar",
+    "Crane",
+    "Crab",
+    "Duck",
+    "Dog",
+    "Deer",
+    "Egret",
+    "Elephant",
+    "Elk",
+    "Flamingo",
+    "Fox",
+    "Frog",
+  ];
+  shuffle(ideas);
+
+  for (const idea of ideas) {
+    if (!names.includes(idea)) {
+      return idea;
+    }
+  }
+
+  let i = 2;
+  while (true) {
+    for (const idea of ideas) {
+      const numbered = idea + i;
+      if (!names.includes(numbered)) {
+        return numbered;
+      }
+    }
+    i++;
+  }
+}
+
+function withPropertyValuesStringified<T>(obj: T): WithStringValues<T> {
+  const out = {} as WithStringValues<T>;
+  for (const key in obj) {
+    out[key] = "" + obj[key];
+  }
+  return out;
+}
+
+function withPropertyValuesParsedAsNumbers<T>(obj: T): WithNumberValues<T> {
+  const out = {} as WithNumberValues<T>;
+  for (const key in obj) {
+    out[key] = +obj[key];
+  }
+  return out;
 }
