@@ -140,6 +140,9 @@ export interface TrainingState {
   opponentNames: readonly string[];
   cyclesCompleted: number;
   relativeRewardLists: RelativeReward[][];
+  hasTrainingBeenTerminated: boolean;
+
+  terminateTraining: () => void;
 }
 
 export interface RelativeReward {

@@ -684,6 +684,56 @@ export default class App extends React.Component<{}, AppState> {
           </section>
         </div>
       );
+    } else if (state.hasTrainingBeenTerminated) {
+      return (
+        <div className="App">
+          <section>
+            <button onClick={this.onAgentListClick}>Done</button>{" "}
+            <h2>Training</h2>
+          </section>
+
+          <section>
+            Terminated training {state.traineeName} (
+            {getAgentTypeDisplayString(
+              getAgent(agents, state.traineeName).agentType
+            )}
+            ) against:{" "}
+            <section>
+              <ol className="Unnumbered">
+                {state.relativeRewardLists.map((relativeRewardList, i) => {
+                  return (
+                    <li key={i}>
+                      Cycle {i}:
+                      <ul>
+                        {opponents.map(({ name: agentName, agent }) => {
+                          const relativeReward = getRelativeReward(
+                            relativeRewardList,
+                            agentName
+                          );
+                          const performance =
+                            (relativeReward + hands) / (2 * hands);
+                          return (
+                            <li key={agentName}>
+                              <label>
+                                {agentName} (
+                                {getAgentTypeDisplayString(agent.agentType)}
+                                ): {relativeReward.toFixed(
+                                  DISPLAYED_DECIMALS
+                                )}{" "}
+                                ({(performance * 100).toFixed(2)}%)
+                              </label>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </li>
+                  );
+                })}
+              </ol>
+            </section>
+          </section>
+        </div>
+      );
     } else {
       return (
         <div className="App">
@@ -1171,6 +1221,9 @@ export default class App extends React.Component<{}, AppState> {
         traineeName: state.selectedAgentName,
         opponentNames: state.opponentNames,
         relativeRewardLists: [],
+        hasTrainingBeenTerminated: false,
+
+        terminateTraining: noOp,
       };
       this.setState(newState, () => this.startTraining(state));
     }
@@ -1224,6 +1277,7 @@ export default class App extends React.Component<{}, AppState> {
               )
             )
           ) {
+            terminateTraining();
             return prevState;
           }
 
@@ -1248,6 +1302,7 @@ export default class App extends React.Component<{}, AppState> {
               cycleNumber,
               relativeRewards
             ),
+            terminateTraining,
           };
           return newState;
         });
@@ -1256,7 +1311,16 @@ export default class App extends React.Component<{}, AppState> {
   }
 
   onTerminateTrainingClick(): void {
-    // TODO
+    const state = this.expectState(StateType.Training);
+
+    state.terminateTraining();
+
+    const newState: TrainingState = {
+      ...state,
+      hasTrainingBeenTerminated: true,
+      terminateTraining: noOp,
+    };
+    this.setState(newState);
   }
 
   onCancelAgentDeletionClick(): void {
@@ -1479,3 +1543,5 @@ function immutSetElement<T>(src: readonly T[], index: number, item: T): T[] {
   clone[index] = item;
   return clone;
 }
+
+function noOp(): void {}
