@@ -59,3 +59,7 @@ export function areAgentCreationOptionsValid(
       );
   }
 }
+
+export function cloneAgent(agent: Agent): Agent {
+  return deserializeAgent(agent.toArrayBuffer());
+}

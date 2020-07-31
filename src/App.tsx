@@ -41,7 +41,10 @@ import {
   TrainingState,
   WithNumberValues,
   WithStringValues,
+  RelativeReward,
 } from "./types/state";
+import * as arraySet from "./arraySet";
+import { trainAsync } from "./offloaders/train";
 
 const DISPLAYED_DECIMALS = 3;
 
@@ -91,6 +94,11 @@ export default class App extends React.Component<{}, AppState> {
       this
     );
     this.onStartEvaluationClick = this.onStartEvaluationClick.bind(this);
+
+    this.onTraineeChange = this.onTraineeChange.bind(this);
+    this.onStartTrainingClick = this.onStartTrainingClick.bind(this);
+
+    this.onTerminateTraining = this.onTerminateTraining.bind(this);
   }
 
   expectState<T extends StateType>(expectedType: T): StateMap[T] {
@@ -478,11 +486,137 @@ export default class App extends React.Component<{}, AppState> {
   renderTrainingAgentSelectionMenu(
     state: TrainingAgentSelectionState
   ): React.ReactElement {
-    return <div className="App"></div>;
+    const agents = state.agents
+      .slice()
+      .sort((a, b) => compareLexicographically(a.name, b.name));
+
+    return (
+      <div className="App">
+        <section>
+          <button onClick={this.onAgentListClick}>Back</button>
+          <h2>Train</h2>
+        </section>
+
+        <section>
+          Train{" "}
+          <select
+            value={state.selectedAgentName}
+            onChange={this.onTraineeChange}
+          >
+            {agents.map(({ name: agentName, agent }) => (
+              <option value={agentName} key={agentName}>
+                {agentName} ({getAgentTypeDisplayString(agent.agentType)})
+              </option>
+            ))}
+          </select>{" "}
+          against:{" "}
+          <section>
+            {agents.map(({ name: agentName, agent }) => (
+              <label key={agentName}>
+                <input
+                  type="checkbox"
+                  checked={state.opponentNames.includes(agentName)}
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                    this.setIsAgentUsedAsOpponent(
+                      agentName,
+                      event.target.checked
+                    )
+                  }
+                />{" "}
+                {agentName} ({getAgentTypeDisplayString(agent.agentType)})
+              </label>
+            ))}
+          </section>
+          <button
+            disabled={state.opponentNames.length < 1}
+            onClick={this.onStartTrainingClick}
+          >
+            Start
+          </button>
+        </section>
+      </div>
+    );
   }
 
   renderTrainingMenu(state: TrainingState): React.ReactElement {
-    return <div className="App"></div>;
+    const agents = state.agents
+      .slice()
+      .sort((a, b) => compareLexicographically(a.name, b.name));
+    const { hands } = state.options.trainingCycleOptions.evaluationOptions;
+    const opponents = state.mostRecentRelativeRewards.map(
+      ({ opponentName }) => ({
+        name: opponentName,
+        agent: getAgent(agents, opponentName),
+      })
+    );
+
+    if (state.cyclesCompleted === state.options.trainingCycles) {
+      return (
+        <div className="App">
+          <section>
+            <button onClick={this.onAgentListClick}>Done</button>{" "}
+            <h2>Training</h2>
+          </section>
+
+          <section>
+            Finished training {state.traineeName} (
+            {getAgentTypeDisplayString(
+              getAgent(agents, state.traineeName).agentType
+            )}
+            ) against:{" "}
+            <section>
+              {opponents.map(({ name: agentName, agent }) => {
+                const relativeReward = getRelativeReward(
+                  state.mostRecentRelativeRewards,
+                  agentName
+                );
+                const performance = (relativeReward + hands) / (2 * hands);
+                return (
+                  <label key={agentName}>
+                    {agentName} ({getAgentTypeDisplayString(agent.agentType)}):{" "}
+                    {relativeReward.toFixed(DISPLAYED_DECIMALS)} (
+                    {(performance * 100).toFixed(2)}%)
+                  </label>
+                );
+              })}
+            </section>
+          </section>
+        </div>
+      );
+    } else {
+      return (
+        <div className="App">
+          <section>
+            <button onClick={this.onTerminateTraining}>Terminate</button>{" "}
+            <h2>Training</h2>
+          </section>
+
+          <section>
+            Training {state.traineeName} (
+            {getAgentTypeDisplayString(
+              getAgent(agents, state.traineeName).agentType
+            )}
+            ) against:{" "}
+            <section>
+              {opponents.map(({ name: agentName, agent }) => {
+                const relativeReward = getRelativeReward(
+                  state.mostRecentRelativeRewards,
+                  agentName
+                );
+                const performance = (relativeReward + hands) / (2 * hands);
+                return (
+                  <label key={agentName}>
+                    {agentName} ({getAgentTypeDisplayString(agent.agentType)}):{" "}
+                    {relativeReward.toFixed(DISPLAYED_DECIMALS)} (
+                    {(performance * 100).toFixed(2)}%)
+                  </label>
+                );
+              })}
+            </section>
+          </section>
+        </div>
+      );
+    }
   }
 
   renderPlayMenu(state: PlayState): React.ReactElement {
@@ -542,7 +676,17 @@ export default class App extends React.Component<{}, AppState> {
   }
 
   onTrainClick(): void {
-    // TODO
+    const { state } = this;
+    const newState: TrainingAgentSelectionState = {
+      stateType: StateType.TrainingAgentSelection,
+
+      agents: state.agents,
+      options: state.options,
+
+      selectedAgentName: state.agents[0].name,
+      opponentNames: [],
+    };
+    this.setState(newState);
   }
 
   onPlayClick(): void {
@@ -861,6 +1005,126 @@ export default class App extends React.Component<{}, AppState> {
       }
     });
   }
+
+  onTraineeChange(event: React.ChangeEvent<HTMLSelectElement>): void {
+    const state = this.expectState(StateType.TrainingAgentSelection);
+    const newState: TrainingAgentSelectionState = {
+      ...state,
+      selectedAgentName: event.target.value,
+    };
+    this.setState(newState);
+  }
+
+  setIsAgentUsedAsOpponent(agentName: string, isUsed: boolean): void {
+    const state = this.expectState(StateType.TrainingAgentSelection);
+    const newState: TrainingAgentSelectionState = {
+      ...state,
+      opponentNames: isUsed
+        ? arraySet.add(state.opponentNames, agentName)
+        : arraySet.remove(state.opponentNames, agentName),
+    };
+    this.setState(newState);
+  }
+
+  onStartTrainingClick(): void {
+    const state = this.expectState(StateType.TrainingAgentSelection);
+    {
+      const newState: TrainingState = {
+        stateType: StateType.Training,
+
+        agents: state.agents,
+        options: state.options,
+
+        cyclesCompleted: 0,
+        traineeName: state.selectedAgentName,
+        mostRecentRelativeRewards: state.opponentNames.map((opponentName) => ({
+          opponentName,
+          reward: 0,
+        })),
+      };
+      this.setState(newState, () => this.startTraining(state));
+    }
+  }
+
+  startTraining(selectionState: TrainingAgentSelectionState): void {
+    const trainee = getNamedAgent(
+      selectionState.agents,
+      selectionState.selectedAgentName
+    );
+    const opponents = selectionState.opponentNames.map((opponentName) =>
+      getNamedAgent(selectionState.agents, opponentName)
+    );
+    const { options } = selectionState;
+    trainAsync(
+      trainee,
+      opponents,
+      options.trainingCycles,
+      options.trainingCycleOptions,
+      options.useMainThreadForExpensiveComputation,
+      (
+        cycleNumber: number,
+        updatedTrainee: NamedAgent,
+        relativeRewards: RelativeReward[],
+        terminateTraining: () => void
+      ): void => {
+        const currentState = this.state;
+
+        if (
+          !(
+            currentState.stateType === StateType.Training &&
+            currentState.traineeName === trainee.name &&
+            arraySet.isEqual(
+              currentState.mostRecentRelativeRewards.map(
+                ({ opponentName }) => opponentName
+              ),
+              selectionState.opponentNames
+            )
+          )
+        ) {
+          terminateTraining();
+          return;
+        }
+
+        this.setState((prevState) => {
+          if (
+            !(
+              prevState.stateType === StateType.Training &&
+              prevState.traineeName === trainee.name &&
+              arraySet.isEqual(
+                prevState.mostRecentRelativeRewards.map(
+                  ({ opponentName }) => opponentName
+                ),
+                selectionState.opponentNames
+              )
+            )
+          ) {
+            return prevState;
+          }
+
+          if (cycleNumber <= prevState.cyclesCompleted) {
+            return prevState;
+          }
+
+          const newState: TrainingState = {
+            ...prevState,
+            agents: prevState.agents.map((prevAgent) =>
+              prevAgent.name === updatedTrainee.name
+                ? updatedTrainee
+                : prevAgent
+            ),
+            cyclesCompleted: cycleNumber + 1,
+            mostRecentRelativeRewards: relativeRewards,
+          };
+          agentsSaver.updateAgent(updatedTrainee);
+          return newState;
+        });
+      }
+    );
+  }
+
+  onTerminateTraining(): void {
+    // TODO
+  }
 }
 
 function getInitialState(): AppState {
@@ -1006,5 +1270,28 @@ function getAgent(agents: NamedAgent[], expectedName: string): Agent {
       JSON.stringify(expectedName) +
       ". The only agents provided were: " +
       JSON.stringify(agents)
+  );
+}
+
+function getNamedAgent(agents: NamedAgent[], expectedName: string): NamedAgent {
+  const agent = getAgent(agents, expectedName);
+  return { name: expectedName, agent };
+}
+
+function getRelativeReward(
+  rewards: RelativeReward[],
+  expectedName: string
+): number {
+  for (const { opponentName, reward } of rewards) {
+    if (opponentName === expectedName) {
+      return reward;
+    }
+  }
+
+  throw new Error(
+    "Cannot find reward against agent named " +
+      JSON.stringify(expectedName) +
+      ". The only relative rewards provided were: " +
+      JSON.stringify(rewards)
   );
 }

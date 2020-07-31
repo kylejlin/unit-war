@@ -107,7 +107,14 @@ export interface TrainingAgentSelectionState {
   agents: NamedAgent[];
   options: AppOptions;
 
-  opponentNames: string[];
+  selectedAgentName: string;
+  /**
+   * Technically, all properties should be immutable,
+   * but `opponentNames` specifically needs to be
+   * immutable so we can assign the output of `arraySet.add()`
+   * to it.
+   */
+  opponentNames: readonly string[];
 }
 
 export interface TrainingState {
@@ -116,6 +123,7 @@ export interface TrainingState {
   agents: NamedAgent[];
   options: AppOptions;
 
+  traineeName: string;
   cyclesCompleted: number;
   mostRecentRelativeRewards: RelativeReward[];
 }

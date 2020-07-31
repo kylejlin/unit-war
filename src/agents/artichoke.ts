@@ -1,6 +1,6 @@
 import { AgentType } from ".";
 import { evaluate } from "../game/evaluate";
-import { Agent, TrainableAgent, TrainingCycleOptions } from "../game/types";
+import { Agent, TrainingCycleOptions } from "../game/types";
 import { isPositiveInteger } from "../numberValidation";
 import { normalRandom } from "../random";
 import { ReadonlyFloat64Array } from "../readonly/readonlyFloat64Array";
@@ -15,7 +15,7 @@ export function areArtichokeCreationOptionsValid(
   return isPositiveInteger(options.hiddenLayerSize);
 }
 
-export class AgentArtichoke implements TrainableAgent {
+export class AgentArtichoke implements Agent {
   readonly agentType: AgentType.Artichoke;
 
   private readonly inputs: Float64Array;
@@ -28,19 +28,17 @@ export class AgentArtichoke implements TrainableAgent {
     this.inputs = new Float64Array(3);
   }
 
-  static fromCreationOptions(
-    options: ArtichokeCreationOptions
-  ): TrainableAgent {
+  static fromCreationOptions(options: ArtichokeCreationOptions): Agent {
     return AgentArtichoke.fromHiddenLayerSize(options.hiddenLayerSize);
   }
 
-  static fromHiddenLayerSize(hiddenSize: number): TrainableAgent {
+  static fromHiddenLayerSize(hiddenSize: number): Agent {
     const leaderNetwork = Network.fromLayerSizes(2, hiddenSize, 2);
     const followerNetwork = Network.fromLayerSizes(3, hiddenSize, 1);
     return new AgentArtichoke(leaderNetwork, followerNetwork);
   }
 
-  static fromArrayBuffer(buffer: ArrayBuffer): TrainableAgent {
+  static fromArrayBuffer(buffer: ArrayBuffer): Agent {
     const floats = new Float64Array(buffer);
     const leaderSize = floats[1];
     const followerSize = floats[2];

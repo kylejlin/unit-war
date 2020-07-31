@@ -22,10 +22,8 @@ export interface Agent {
    */
   follow: (strength: number, initialBid: number, noise: number) => number;
 
-  toArrayBuffer(): ArrayBuffer;
-}
+  toArrayBuffer: () => ArrayBuffer;
 
-export interface TrainableAgent extends Agent {
   train: (opponent: Agent, options: TrainingCycleOptions) => void;
 }
 
