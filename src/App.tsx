@@ -462,7 +462,7 @@ export default class App extends React.Component<{}, AppState> {
     } else {
       const { firstAgentReward } = state;
       if (firstAgentReward === undefined) {
-        return this.renderEvaluationPendingMenu(state);
+        return this.renderEvaluationInProgressMenu(state);
       } else {
         return this.renderEvaluationCompleteMenu(state, firstAgentReward);
       }
@@ -513,7 +513,7 @@ export default class App extends React.Component<{}, AppState> {
     );
   }
 
-  renderEvaluationPendingMenu(state: EvaluationState): React.ReactElement {
+  renderEvaluationInProgressMenu(state: EvaluationState): React.ReactElement {
     const { selectedAgentNames } = state;
 
     return (
@@ -625,6 +625,16 @@ export default class App extends React.Component<{}, AppState> {
   }
 
   renderTrainingMenu(state: TrainingState): React.ReactElement {
+    if (state.cyclesCompleted === state.options.trainingCycles) {
+      return this.renderTrainingCompleteMenu(state);
+    } else if (state.hasTrainingBeenTerminated) {
+      return this.renderTrainingTerminatedMenu(state);
+    } else {
+      return this.renderTrainingInProgressMenu(state);
+    }
+  }
+
+  renderTrainingCompleteMenu(state: TrainingState): React.ReactElement {
     const agents = state.agents
       .slice()
       .sort((a, b) => compareLexicographically(a.name, b.name));
@@ -634,157 +644,171 @@ export default class App extends React.Component<{}, AppState> {
       agent: getAgent(agents, opponentName),
     }));
 
-    if (state.cyclesCompleted === state.options.trainingCycles) {
-      return (
-        <div className="App">
-          <section>
-            <button onClick={this.onAgentListClick}>Done</button>{" "}
-            <h2>Training</h2>
-          </section>
+    return (
+      <div className="App">
+        <section>
+          <button onClick={this.onAgentListClick}>Done</button>{" "}
+          <h2>Training</h2>
+        </section>
 
+        <section>
+          Finished training {state.traineeName} (
+          {getAgentTypeDisplayString(
+            getAgent(agents, state.traineeName).agentType
+          )}
+          ) against:{" "}
           <section>
-            Finished training {state.traineeName} (
-            {getAgentTypeDisplayString(
-              getAgent(agents, state.traineeName).agentType
-            )}
-            ) against:{" "}
-            <section>
-              <ol className="Unnumbered">
-                {state.relativeRewardLists.map((relativeRewardList, i) => {
-                  return (
-                    <li key={i}>
-                      Cycle {i}:
-                      <ul>
-                        {opponents.map(({ name: agentName, agent }) => {
-                          const relativeReward = getRelativeReward(
-                            relativeRewardList,
-                            agentName
-                          );
-                          const performance =
-                            (relativeReward + hands) / (2 * hands);
-                          return (
-                            <li key={agentName}>
-                              <label>
-                                {agentName} (
-                                {getAgentTypeDisplayString(agent.agentType)}
-                                ): {relativeReward.toFixed(
-                                  DISPLAYED_DECIMALS
-                                )}{" "}
-                                ({(performance * 100).toFixed(2)}%)
-                              </label>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </li>
-                  );
-                })}
-              </ol>
-            </section>
+            <ol className="Unnumbered">
+              {state.relativeRewardLists.map((relativeRewardList, i) => {
+                return (
+                  <li key={i}>
+                    Cycle {i}:
+                    <ul>
+                      {opponents.map(({ name: agentName, agent }) => {
+                        const relativeReward = getRelativeReward(
+                          relativeRewardList,
+                          agentName
+                        );
+                        const performance =
+                          (relativeReward + hands) / (2 * hands);
+                        return (
+                          <li key={agentName}>
+                            <label>
+                              {agentName} (
+                              {getAgentTypeDisplayString(agent.agentType)}
+                              ): {relativeReward.toFixed(DISPLAYED_DECIMALS)} (
+                              {(performance * 100).toFixed(2)}%)
+                            </label>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </li>
+                );
+              })}
+            </ol>
           </section>
-        </div>
-      );
-    } else if (state.hasTrainingBeenTerminated) {
-      return (
-        <div className="App">
-          <section>
-            <button onClick={this.onAgentListClick}>Done</button>{" "}
-            <h2>Training</h2>
-          </section>
+        </section>
+      </div>
+    );
+  }
 
-          <section>
-            Terminated training {state.traineeName} (
-            {getAgentTypeDisplayString(
-              getAgent(agents, state.traineeName).agentType
-            )}
-            ) against:{" "}
-            <section>
-              <ol className="Unnumbered">
-                {state.relativeRewardLists.map((relativeRewardList, i) => {
-                  return (
-                    <li key={i}>
-                      Cycle {i}:
-                      <ul>
-                        {opponents.map(({ name: agentName, agent }) => {
-                          const relativeReward = getRelativeReward(
-                            relativeRewardList,
-                            agentName
-                          );
-                          const performance =
-                            (relativeReward + hands) / (2 * hands);
-                          return (
-                            <li key={agentName}>
-                              <label>
-                                {agentName} (
-                                {getAgentTypeDisplayString(agent.agentType)}
-                                ): {relativeReward.toFixed(
-                                  DISPLAYED_DECIMALS
-                                )}{" "}
-                                ({(performance * 100).toFixed(2)}%)
-                              </label>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </li>
-                  );
-                })}
-              </ol>
-            </section>
-          </section>
-        </div>
-      );
-    } else {
-      return (
-        <div className="App">
-          <section>
-            <button onClick={this.onTerminateTrainingClick}>Terminate</button>{" "}
-            <h2>Training</h2>
-          </section>
+  renderTrainingTerminatedMenu(state: TrainingState): React.ReactElement {
+    const agents = state.agents
+      .slice()
+      .sort((a, b) => compareLexicographically(a.name, b.name));
+    const { hands } = state.options.trainingCycleOptions.evaluationOptions;
+    const opponents = state.opponentNames.map((opponentName) => ({
+      name: opponentName,
+      agent: getAgent(agents, opponentName),
+    }));
 
+    return (
+      <div className="App">
+        <section>
+          <button onClick={this.onAgentListClick}>Done</button>{" "}
+          <h2>Training</h2>
+        </section>
+
+        <section>
+          Terminated training {state.traineeName} (
+          {getAgentTypeDisplayString(
+            getAgent(agents, state.traineeName).agentType
+          )}
+          ) against:{" "}
           <section>
-            Training {state.traineeName} (
-            {getAgentTypeDisplayString(
-              getAgent(agents, state.traineeName).agentType
-            )}
-            ) against:{" "}
-            <section>
-              <ol className="Unnumbered">
-                {state.relativeRewardLists.map((relativeRewardList, i) => {
-                  return (
-                    <li key={i}>
-                      Cycle {i}:
-                      <ul>
-                        {opponents.map(({ name: agentName, agent }) => {
-                          const relativeReward = getRelativeReward(
-                            relativeRewardList,
-                            agentName
-                          );
-                          const performance =
-                            (relativeReward + hands) / (2 * hands);
-                          return (
-                            <li key={agentName}>
-                              <label>
-                                {agentName} (
-                                {getAgentTypeDisplayString(agent.agentType)}
-                                ): {relativeReward.toFixed(
-                                  DISPLAYED_DECIMALS
-                                )}{" "}
-                                ({(performance * 100).toFixed(2)}%)
-                              </label>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </li>
-                  );
-                })}
-              </ol>
-            </section>
+            <ol className="Unnumbered">
+              {state.relativeRewardLists.map((relativeRewardList, i) => {
+                return (
+                  <li key={i}>
+                    Cycle {i}:
+                    <ul>
+                      {opponents.map(({ name: agentName, agent }) => {
+                        const relativeReward = getRelativeReward(
+                          relativeRewardList,
+                          agentName
+                        );
+                        const performance =
+                          (relativeReward + hands) / (2 * hands);
+                        return (
+                          <li key={agentName}>
+                            <label>
+                              {agentName} (
+                              {getAgentTypeDisplayString(agent.agentType)}
+                              ): {relativeReward.toFixed(DISPLAYED_DECIMALS)} (
+                              {(performance * 100).toFixed(2)}%)
+                            </label>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </li>
+                );
+              })}
+            </ol>
           </section>
-        </div>
-      );
-    }
+        </section>
+      </div>
+    );
+  }
+
+  renderTrainingInProgressMenu(state: TrainingState): React.ReactElement {
+    const agents = state.agents
+      .slice()
+      .sort((a, b) => compareLexicographically(a.name, b.name));
+    const { hands } = state.options.trainingCycleOptions.evaluationOptions;
+    const opponents = state.opponentNames.map((opponentName) => ({
+      name: opponentName,
+      agent: getAgent(agents, opponentName),
+    }));
+
+    return (
+      <div className="App">
+        <section>
+          <button onClick={this.onTerminateTrainingClick}>Terminate</button>{" "}
+          <h2>Training</h2>
+        </section>
+
+        <section>
+          Training {state.traineeName} (
+          {getAgentTypeDisplayString(
+            getAgent(agents, state.traineeName).agentType
+          )}
+          ) against:{" "}
+          <section>
+            <ol className="Unnumbered">
+              {state.relativeRewardLists.map((relativeRewardList, i) => {
+                return (
+                  <li key={i}>
+                    Cycle {i}:
+                    <ul>
+                      {opponents.map(({ name: agentName, agent }) => {
+                        const relativeReward = getRelativeReward(
+                          relativeRewardList,
+                          agentName
+                        );
+                        const performance =
+                          (relativeReward + hands) / (2 * hands);
+                        return (
+                          <li key={agentName}>
+                            <label>
+                              {agentName} (
+                              {getAgentTypeDisplayString(agent.agentType)}
+                              ): {relativeReward.toFixed(DISPLAYED_DECIMALS)} (
+                              {(performance * 100).toFixed(2)}%)
+                            </label>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </li>
+                );
+              })}
+            </ol>
+          </section>
+        </section>
+      </div>
+    );
   }
 
   renderPlayMenu(state: PlayState): React.ReactElement {
