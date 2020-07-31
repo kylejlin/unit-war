@@ -98,7 +98,7 @@ export interface EvaluationState {
 
   selectedAgentNames: [string, string];
   hasStartedEvaluation: boolean;
-  firstAgentReward: undefined | string;
+  firstAgentReward: undefined | number;
 }
 
 export interface TrainingAgentSelectionState {

@@ -10,11 +10,13 @@ import {
 } from "./agents";
 import { ArtichokeCreationOptions } from "./agents/artichoke";
 import "./App.css";
+import { Agent } from "./game/types";
 import {
   isOnInclusiveUnitInterval,
   isPositiveFiniteNumber,
   isPositiveInteger,
 } from "./numberValidation";
+import { promisifiedEvaluate } from "./offloaders/evaluate";
 import { shuffle } from "./random";
 import * as agentsSaver from "./stateSavers/agentsSaver";
 import {
@@ -30,6 +32,7 @@ import {
   APP_OPTIONS_VERSION,
   EvaluationState,
   GraphState,
+  NamedAgent,
   OptionsState,
   PlayState,
   StateMap,
@@ -39,6 +42,8 @@ import {
   WithNumberValues,
   WithStringValues,
 } from "./types/state";
+
+const DISPLAYED_DECIMALS = 3;
 
 export default class App extends React.Component<{}, AppState> {
   constructor(props: {}) {
@@ -78,6 +83,14 @@ export default class App extends React.Component<{}, AppState> {
     this.onAgentNameChange = this.onAgentNameChange.bind(this);
     this.onAgentTypeChange = this.onAgentTypeChange.bind(this);
     this.onConfirmCreationClick = this.onConfirmCreationClick.bind(this);
+
+    this.onFirstEvaluatedAgentNameChange = this.onFirstEvaluatedAgentNameChange.bind(
+      this
+    );
+    this.onSecondEvaluatedAgentNameChange = this.onSecondEvaluatedAgentNameChange.bind(
+      this
+    );
+    this.onStartEvaluationClick = this.onStartEvaluationClick.bind(this);
   }
 
   expectState<T extends StateType>(expectedType: T): StateMap[T] {
@@ -353,10 +366,11 @@ export default class App extends React.Component<{}, AppState> {
     if (!state.hasStartedEvaluation) {
       return this.renderEvaluationAgentSelectionMenu(state);
     } else {
-      if (state.firstAgentReward === undefined) {
+      const { firstAgentReward } = state;
+      if (firstAgentReward === undefined) {
         return this.renderEvaluationPendingMenu(state);
       } else {
-        return this.renderEvaluationCompleteMenu(state);
+        return this.renderEvaluationCompleteMenu(state, firstAgentReward);
       }
     }
   }
@@ -364,26 +378,101 @@ export default class App extends React.Component<{}, AppState> {
   renderEvaluationAgentSelectionMenu(
     state: EvaluationState
   ): React.ReactElement {
+    const { selectedAgentNames } = state;
+    const agents = state.agents
+      .slice()
+      .sort((a, b) => compareLexicographically(a.name, b.name));
+
     return (
       <div className="App">
         <section>
           <button onClick={this.onAgentListClick}>Back</button>
           <h2>Evaluate</h2>
         </section>
+
         <section>
-          Evaluate <select></select> against <select></select>
-          <button>Start</button>
+          Evaluate{" "}
+          <select
+            value={selectedAgentNames[0]}
+            onChange={this.onFirstEvaluatedAgentNameChange}
+          >
+            {agents.map(({ name: agentName, agent }) => (
+              <option value={agentName} key={agentName}>
+                {agentName} ({getAgentTypeDisplayString(agent.agentType)})
+              </option>
+            ))}
+          </select>{" "}
+          against{" "}
+          <select
+            value={selectedAgentNames[1]}
+            onChange={this.onSecondEvaluatedAgentNameChange}
+          >
+            {agents.map(({ name: agentName, agent }) => (
+              <option value={agentName} key={agentName}>
+                {agentName} ({getAgentTypeDisplayString(agent.agentType)})
+              </option>
+            ))}
+          </select>
+          <button onClick={this.onStartEvaluationClick}>Start</button>
         </section>
       </div>
     );
   }
 
   renderEvaluationPendingMenu(state: EvaluationState): React.ReactElement {
-    return <div className="App"></div>;
+    const { selectedAgentNames } = state;
+
+    return (
+      <div className="App">
+        <section>
+          <button onClick={this.onAgentListClick}>Cancel</button>
+          <h2>Evaluate</h2>
+        </section>
+
+        <section>
+          Evaluating {selectedAgentNames[0]} (
+          {getAgentTypeDisplayString(
+            getAgent(state.agents, selectedAgentNames[0]).agentType
+          )}
+          ) against {selectedAgentNames[1]} (
+          {getAgentTypeDisplayString(
+            getAgent(state.agents, selectedAgentNames[1]).agentType
+          )}
+          ...
+        </section>
+      </div>
+    );
   }
 
-  renderEvaluationCompleteMenu(state: EvaluationState): React.ReactElement {
-    return <div className="App"></div>;
+  renderEvaluationCompleteMenu(
+    state: EvaluationState,
+    firstAgentReward: number
+  ): React.ReactElement {
+    const { selectedAgentNames } = state;
+    const { hands } = state.options.trainingCycleOptions.evaluationOptions;
+
+    return (
+      <div className="App">
+        <section>
+          <button onClick={this.onAgentListClick}>Done</button>
+          <h2>Evaluate</h2>
+        </section>
+
+        <section>
+          Evaluated {selectedAgentNames[0]} (
+          {getAgentTypeDisplayString(
+            getAgent(state.agents, selectedAgentNames[0]).agentType
+          )}
+          ) against {selectedAgentNames[1]} (
+          {getAgentTypeDisplayString(
+            getAgent(state.agents, selectedAgentNames[1]).agentType
+          )}
+          ): {firstAgentReward > 0 ? "+" : ""}
+          {firstAgentReward.toFixed(DISPLAYED_DECIMALS)} (
+          {((100 * (firstAgentReward + hands)) / (2 * hands)).toFixed(2)}%)
+        </section>
+      </div>
+    );
   }
 
   renderTrainingAgentSelectionMenu(
@@ -435,7 +524,21 @@ export default class App extends React.Component<{}, AppState> {
   }
 
   onEvaluateClick(): void {
-    // TODO
+    const state = this.expectState(StateType.AgentList);
+    const newState: EvaluationState = {
+      stateType: StateType.Evaluation,
+
+      agents: state.agents,
+      options: state.options,
+
+      selectedAgentNames:
+        state.agents.length >= 2
+          ? [state.agents[0].name, state.agents[1].name]
+          : [state.agents[0].name, state.agents[0].name],
+      hasStartedEvaluation: false,
+      firstAgentReward: undefined,
+    };
+    this.setState(newState);
   }
 
   onTrainClick(): void {
@@ -701,6 +804,63 @@ export default class App extends React.Component<{}, AppState> {
     };
     this.setState(newState);
   }
+
+  onFirstEvaluatedAgentNameChange(
+    event: React.ChangeEvent<HTMLSelectElement>
+  ): void {
+    const state = this.expectState(StateType.Evaluation);
+    const newState: EvaluationState = {
+      ...state,
+      selectedAgentNames: [event.target.value, state.selectedAgentNames[1]],
+    };
+    this.setState(newState);
+  }
+
+  onSecondEvaluatedAgentNameChange(
+    event: React.ChangeEvent<HTMLSelectElement>
+  ): void {
+    const state = this.expectState(StateType.Evaluation);
+    const newState: EvaluationState = {
+      ...state,
+      selectedAgentNames: [state.selectedAgentNames[0], event.target.value],
+    };
+    this.setState(newState);
+  }
+
+  onStartEvaluationClick(): void {
+    const state = this.expectState(StateType.Evaluation);
+
+    if (state.hasStartedEvaluation) {
+      return;
+    }
+
+    {
+      const newState: EvaluationState = {
+        ...state,
+        hasStartedEvaluation: true,
+      };
+      this.setState(newState);
+    }
+
+    const firstAgent = getAgent(state.agents, state.selectedAgentNames[0]);
+    const secondAgent = getAgent(state.agents, state.selectedAgentNames[1]);
+    promisifiedEvaluate(
+      firstAgent,
+      secondAgent,
+      state.options.trainingCycleOptions.evaluationOptions,
+      state.options.useMainThreadForExpensiveComputation
+    ).then((firstAgentReward) => {
+      const currentState = this.state;
+      if (
+        currentState.stateType === StateType.Evaluation &&
+        currentState.selectedAgentNames[0] === state.selectedAgentNames[0] &&
+        currentState.selectedAgentNames[1] === state.selectedAgentNames[1]
+      ) {
+        const newState: EvaluationState = { ...currentState, firstAgentReward };
+        this.setState(newState);
+      }
+    });
+  }
 }
 
 function getInitialState(): AppState {
@@ -832,4 +992,19 @@ function withPropertyValuesParsedAsNumbers<T>(obj: T): WithNumberValues<T> {
     out[key] = +obj[key];
   }
   return out;
+}
+
+function getAgent(agents: NamedAgent[], expectedName: string): Agent {
+  for (const { name, agent } of agents) {
+    if (expectedName === name) {
+      return agent;
+    }
+  }
+
+  throw new Error(
+    "Cannot find agent named " +
+      JSON.stringify(expectedName) +
+      ". The only agents provided were: " +
+      JSON.stringify(agents)
+  );
 }
