@@ -2,3 +2,12 @@
   color: red;
   border: 1px solid red;
 }
+
+.DangerButton {
+  background-color: maroon;
+  color: white;
+}
+
+.Unnumbered {
+  list-style: none;
+}

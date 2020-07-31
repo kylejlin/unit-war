@@ -10,6 +10,7 @@ import {
 } from "./agents";
 import { ArtichokeCreationOptions } from "./agents/artichoke";
 import "./App.css";
+import * as arraySet from "./arraySet";
 import { Agent } from "./game/types";
 import {
   isOnInclusiveUnitInterval,
@@ -17,6 +18,7 @@ import {
   isPositiveInteger,
 } from "./numberValidation";
 import { promisifiedEvaluate } from "./offloaders/evaluate";
+import { trainAsync } from "./offloaders/train";
 import { shuffle } from "./random";
 import * as agentsSaver from "./stateSavers/agentsSaver";
 import {
@@ -25,6 +27,7 @@ import {
 } from "./stateSavers/appOptionsSaver";
 import {
   AgentCreationState,
+  AgentDeletionState,
   AgentListState,
   AppOptionInputValues,
   AppOptions,
@@ -35,22 +38,22 @@ import {
   NamedAgent,
   OptionsState,
   PlayState,
+  RelativeReward,
   StateMap,
   StateType,
   TrainingAgentSelectionState,
   TrainingState,
   WithNumberValues,
   WithStringValues,
-  RelativeReward,
 } from "./types/state";
-import * as arraySet from "./arraySet";
-import { trainAsync } from "./offloaders/train";
 
 const DISPLAYED_DECIMALS = 3;
 
 export default class App extends React.Component<{}, AppState> {
   constructor(props: {}) {
     super(props);
+
+    (window as any).app = this;
 
     this.state = getInitialState();
 
@@ -60,6 +63,7 @@ export default class App extends React.Component<{}, AppState> {
   bindMethods(): void {
     this.onOptionsClick = this.onOptionsClick.bind(this);
     this.onCreateAgentClick = this.onCreateAgentClick.bind(this);
+    this.onDeleteAgentClick = this.onDeleteAgentClick.bind(this);
     this.onEvaluateClick = this.onEvaluateClick.bind(this);
     this.onTrainClick = this.onTrainClick.bind(this);
     this.onPlayClick = this.onPlayClick.bind(this);
@@ -98,7 +102,20 @@ export default class App extends React.Component<{}, AppState> {
     this.onTraineeChange = this.onTraineeChange.bind(this);
     this.onStartTrainingClick = this.onStartTrainingClick.bind(this);
 
-    this.onTerminateTraining = this.onTerminateTraining.bind(this);
+    this.onTerminateTrainingClick = this.onTerminateTrainingClick.bind(this);
+
+    this.onCancelAgentDeletionClick = this.onCancelAgentDeletionClick.bind(
+      this
+    );
+    this.onConfirmAgentDeletionClick = this.onConfirmAgentDeletionClick.bind(
+      this
+    );
+    this.onNameOfAgentToBeDeletedChange = this.onNameOfAgentToBeDeletedChange.bind(
+      this
+    );
+    this.onSelectAgentForDeletionClick = this.onSelectAgentForDeletionClick.bind(
+      this
+    );
   }
 
   expectState<T extends StateType>(expectedType: T): StateMap[T] {
@@ -125,6 +142,8 @@ export default class App extends React.Component<{}, AppState> {
         return this.renderOptionsMenu(state);
       case StateType.AgentCreation:
         return this.renderAgentCreationMenu(state);
+      case StateType.AgentDeletion:
+        return this.renderAgentDeletionMenu(state);
       case StateType.Evaluation:
         return this.renderEvaluationMenu(state);
       case StateType.TrainingAgentSelection:
@@ -160,6 +179,12 @@ export default class App extends React.Component<{}, AppState> {
         <section>
           <button onClick={this.onOptionsClick}>Options</button>
           <button onClick={this.onCreateAgentClick}>Create agent</button>
+          <button
+            disabled={agents.length === 0}
+            onClick={this.onDeleteAgentClick}
+          >
+            Delete agent
+          </button>
           <button disabled={agents.length === 0} onClick={this.onEvaluateClick}>
             Evaluate
           </button>
@@ -370,6 +395,67 @@ export default class App extends React.Component<{}, AppState> {
     }
   }
 
+  renderAgentDeletionMenu(state: AgentDeletionState): React.ReactElement {
+    const agents = state.agents
+      .slice()
+      .sort((a, b) => compareLexicographically(a.name, b.name));
+
+    return (
+      <div className="App">
+        <section>
+          <button onClick={this.onAgentListClick}>Back</button>
+          <h2>Delete agent</h2>
+        </section>
+
+        {state.isConfirmingDeletion ? (
+          <section>
+            <p>
+              Are you sure you want to delete {state.selectedAgentName} (
+              {getAgentTypeDisplayString(
+                getAgent(state.agents, state.selectedAgentName).agentType
+              )}
+              )?
+            </p>
+
+            <p>
+              The deletion will be permanent, and it will be impossible to
+              restore this agent.
+            </p>
+
+            <section>
+              <button onClick={this.onCancelAgentDeletionClick}>Cancel</button>
+              <button
+                className="DangerButton"
+                onClick={this.onConfirmAgentDeletionClick}
+              >
+                Confirm
+              </button>
+            </section>
+          </section>
+        ) : (
+          <section>
+            <label>
+              Choose an agent to delete:{" "}
+              <select
+                value={state.selectedAgentName}
+                onChange={this.onNameOfAgentToBeDeletedChange}
+              >
+                {agents.map(({ name: agentName, agent }) => (
+                  <option key={agentName} value={agentName}>
+                    {agentName} ({getAgentTypeDisplayString(agent.agentType)})
+                  </option>
+                ))}
+              </select>
+              <button onClick={this.onSelectAgentForDeletionClick}>
+                Select
+              </button>
+            </label>
+          </section>
+        )}
+      </div>
+    );
+  }
+
   renderEvaluationMenu(state: EvaluationState): React.ReactElement {
     if (!state.hasStartedEvaluation) {
       return this.renderEvaluationAgentSelectionMenu(state);
@@ -543,12 +629,10 @@ export default class App extends React.Component<{}, AppState> {
       .slice()
       .sort((a, b) => compareLexicographically(a.name, b.name));
     const { hands } = state.options.trainingCycleOptions.evaluationOptions;
-    const opponents = state.mostRecentRelativeRewards.map(
-      ({ opponentName }) => ({
-        name: opponentName,
-        agent: getAgent(agents, opponentName),
-      })
-    );
+    const opponents = state.opponentNames.map((opponentName) => ({
+      name: opponentName,
+      agent: getAgent(agents, opponentName),
+    }));
 
     if (state.cyclesCompleted === state.options.trainingCycles) {
       return (
@@ -565,20 +649,37 @@ export default class App extends React.Component<{}, AppState> {
             )}
             ) against:{" "}
             <section>
-              {opponents.map(({ name: agentName, agent }) => {
-                const relativeReward = getRelativeReward(
-                  state.mostRecentRelativeRewards,
-                  agentName
-                );
-                const performance = (relativeReward + hands) / (2 * hands);
-                return (
-                  <label key={agentName}>
-                    {agentName} ({getAgentTypeDisplayString(agent.agentType)}):{" "}
-                    {relativeReward.toFixed(DISPLAYED_DECIMALS)} (
-                    {(performance * 100).toFixed(2)}%)
-                  </label>
-                );
-              })}
+              <ol className="Unnumbered">
+                {state.relativeRewardLists.map((relativeRewardList, i) => {
+                  return (
+                    <li key={i}>
+                      Cycle {i}:
+                      <ul>
+                        {opponents.map(({ name: agentName, agent }) => {
+                          const relativeReward = getRelativeReward(
+                            relativeRewardList,
+                            agentName
+                          );
+                          const performance =
+                            (relativeReward + hands) / (2 * hands);
+                          return (
+                            <li key={agentName}>
+                              <label>
+                                {agentName} (
+                                {getAgentTypeDisplayString(agent.agentType)}
+                                ): {relativeReward.toFixed(
+                                  DISPLAYED_DECIMALS
+                                )}{" "}
+                                ({(performance * 100).toFixed(2)}%)
+                              </label>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </li>
+                  );
+                })}
+              </ol>
             </section>
           </section>
         </div>
@@ -587,7 +688,7 @@ export default class App extends React.Component<{}, AppState> {
       return (
         <div className="App">
           <section>
-            <button onClick={this.onTerminateTraining}>Terminate</button>{" "}
+            <button onClick={this.onTerminateTrainingClick}>Terminate</button>{" "}
             <h2>Training</h2>
           </section>
 
@@ -598,20 +699,37 @@ export default class App extends React.Component<{}, AppState> {
             )}
             ) against:{" "}
             <section>
-              {opponents.map(({ name: agentName, agent }) => {
-                const relativeReward = getRelativeReward(
-                  state.mostRecentRelativeRewards,
-                  agentName
-                );
-                const performance = (relativeReward + hands) / (2 * hands);
-                return (
-                  <label key={agentName}>
-                    {agentName} ({getAgentTypeDisplayString(agent.agentType)}):{" "}
-                    {relativeReward.toFixed(DISPLAYED_DECIMALS)} (
-                    {(performance * 100).toFixed(2)}%)
-                  </label>
-                );
-              })}
+              <ol className="Unnumbered">
+                {state.relativeRewardLists.map((relativeRewardList, i) => {
+                  return (
+                    <li key={i}>
+                      Cycle {i}:
+                      <ul>
+                        {opponents.map(({ name: agentName, agent }) => {
+                          const relativeReward = getRelativeReward(
+                            relativeRewardList,
+                            agentName
+                          );
+                          const performance =
+                            (relativeReward + hands) / (2 * hands);
+                          return (
+                            <li key={agentName}>
+                              <label>
+                                {agentName} (
+                                {getAgentTypeDisplayString(agent.agentType)}
+                                ): {relativeReward.toFixed(
+                                  DISPLAYED_DECIMALS
+                                )}{" "}
+                                ({(performance * 100).toFixed(2)}%)
+                              </label>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </li>
+                  );
+                })}
+              </ol>
             </section>
           </section>
         </div>
@@ -653,6 +771,20 @@ export default class App extends React.Component<{}, AppState> {
         getDefaultAgentCreationOptions(AgentType.Artichoke)
       ),
       agentName: getUnusedAgentName(state.agents.map(({ name }) => name)),
+    };
+    this.setState(newState);
+  }
+
+  onDeleteAgentClick(): void {
+    const state = this.expectState(StateType.AgentList);
+    const newState: AgentDeletionState = {
+      stateType: StateType.AgentDeletion,
+
+      agents: state.agents,
+      options: state.options,
+
+      selectedAgentName: state.agents[0].name,
+      isConfirmingDeletion: false,
     };
     this.setState(newState);
   }
@@ -1037,24 +1169,22 @@ export default class App extends React.Component<{}, AppState> {
 
         cyclesCompleted: 0,
         traineeName: state.selectedAgentName,
-        mostRecentRelativeRewards: state.opponentNames.map((opponentName) => ({
-          opponentName,
-          reward: 0,
-        })),
+        opponentNames: state.opponentNames,
+        relativeRewardLists: [],
       };
       this.setState(newState, () => this.startTraining(state));
     }
   }
 
-  startTraining(selectionState: TrainingAgentSelectionState): void {
+  startTraining(preTrainingState: TrainingAgentSelectionState): void {
     const trainee = getNamedAgent(
-      selectionState.agents,
-      selectionState.selectedAgentName
+      preTrainingState.agents,
+      preTrainingState.selectedAgentName
     );
-    const opponents = selectionState.opponentNames.map((opponentName) =>
-      getNamedAgent(selectionState.agents, opponentName)
+    const opponents = preTrainingState.opponentNames.map((opponentName) =>
+      getNamedAgent(preTrainingState.agents, opponentName)
     );
-    const { options } = selectionState;
+    const { options } = preTrainingState;
     trainAsync(
       trainee,
       opponents,
@@ -1074,10 +1204,8 @@ export default class App extends React.Component<{}, AppState> {
             currentState.stateType === StateType.Training &&
             currentState.traineeName === trainee.name &&
             arraySet.isEqual(
-              currentState.mostRecentRelativeRewards.map(
-                ({ opponentName }) => opponentName
-              ),
-              selectionState.opponentNames
+              currentState.opponentNames,
+              preTrainingState.opponentNames
             )
           )
         ) {
@@ -1091,39 +1219,89 @@ export default class App extends React.Component<{}, AppState> {
               prevState.stateType === StateType.Training &&
               prevState.traineeName === trainee.name &&
               arraySet.isEqual(
-                prevState.mostRecentRelativeRewards.map(
-                  ({ opponentName }) => opponentName
-                ),
-                selectionState.opponentNames
+                prevState.opponentNames,
+                preTrainingState.opponentNames
               )
             )
           ) {
             return prevState;
           }
 
-          if (cycleNumber <= prevState.cyclesCompleted) {
-            return prevState;
+          let newAgent: NamedAgent;
+          if (cycleNumber >= prevState.cyclesCompleted) {
+            newAgent = updatedTrainee;
+            agentsSaver.updateAgent(newAgent);
+          } else {
+            newAgent = prevState.agents.find(
+              (agent) => agent.name === trainee.name
+            )!;
           }
 
           const newState: TrainingState = {
             ...prevState,
             agents: prevState.agents.map((prevAgent) =>
-              prevAgent.name === updatedTrainee.name
-                ? updatedTrainee
-                : prevAgent
+              prevAgent.name === updatedTrainee.name ? newAgent : prevAgent
             ),
             cyclesCompleted: cycleNumber + 1,
-            mostRecentRelativeRewards: relativeRewards,
+            relativeRewardLists: immutSetElement(
+              prevState.relativeRewardLists,
+              cycleNumber,
+              relativeRewards
+            ),
           };
-          agentsSaver.updateAgent(updatedTrainee);
           return newState;
         });
       }
     );
   }
 
-  onTerminateTraining(): void {
+  onTerminateTrainingClick(): void {
     // TODO
+  }
+
+  onCancelAgentDeletionClick(): void {
+    const state = this.expectState(StateType.AgentDeletion);
+    const newState: AgentDeletionState = {
+      ...state,
+      isConfirmingDeletion: false,
+    };
+    this.setState(newState);
+  }
+
+  onConfirmAgentDeletionClick(): void {
+    const state = this.expectState(StateType.AgentDeletion);
+
+    agentsSaver.removeAgent(state.selectedAgentName);
+
+    const newState: AgentListState = {
+      stateType: StateType.AgentList,
+
+      agents: state.agents.filter(
+        ({ name }) => name !== state.selectedAgentName
+      ),
+      options: state.options,
+    };
+    this.setState(newState);
+  }
+
+  onNameOfAgentToBeDeletedChange(
+    event: React.ChangeEvent<HTMLSelectElement>
+  ): void {
+    const state = this.expectState(StateType.AgentDeletion);
+    const newState: AgentDeletionState = {
+      ...state,
+      selectedAgentName: event.target.value,
+    };
+    this.setState(newState);
+  }
+
+  onSelectAgentForDeletionClick(): void {
+    const state = this.expectState(StateType.AgentDeletion);
+    const newState: AgentDeletionState = {
+      ...state,
+      isConfirmingDeletion: true,
+    };
+    this.setState(newState);
   }
 }
 
@@ -1294,4 +1472,10 @@ function getRelativeReward(
       ". The only relative rewards provided were: " +
       JSON.stringify(rewards)
   );
+}
+
+function immutSetElement<T>(src: readonly T[], index: number, item: T): T[] {
+  const clone = src.slice();
+  clone[index] = item;
+  return clone;
 }

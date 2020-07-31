@@ -5,6 +5,7 @@ export type AppState =
   | AgentListState
   | OptionsState
   | AgentCreationState
+  | AgentDeletionState
   | EvaluationState
   | TrainingAgentSelectionState
   | TrainingState
@@ -15,6 +16,7 @@ export enum StateType {
   AgentList,
   Options,
   AgentCreation,
+  AgentDeletion,
   Evaluation,
   TrainingAgentSelection,
   Training,
@@ -26,6 +28,7 @@ export interface StateMap {
   [StateType.AgentList]: AgentListState;
   [StateType.Options]: OptionsState;
   [StateType.AgentCreation]: AgentCreationState;
+  [StateType.AgentDeletion]: AgentDeletionState;
   [StateType.Evaluation]: EvaluationState;
   [StateType.TrainingAgentSelection]: TrainingAgentSelectionState;
   [StateType.Training]: TrainingState;
@@ -90,6 +93,16 @@ export type WithStringValues<T> = { [key in keyof T]: string };
 
 export type WithNumberValues<T> = { [key in keyof T]: number };
 
+export interface AgentDeletionState {
+  stateType: StateType.AgentDeletion;
+
+  agents: NamedAgent[];
+  options: AppOptions;
+
+  selectedAgentName: string;
+  isConfirmingDeletion: boolean;
+}
+
 export interface EvaluationState {
   stateType: StateType.Evaluation;
 
@@ -124,8 +137,9 @@ export interface TrainingState {
   options: AppOptions;
 
   traineeName: string;
+  opponentNames: readonly string[];
   cyclesCompleted: number;
-  mostRecentRelativeRewards: RelativeReward[];
+  relativeRewardLists: RelativeReward[][];
 }
 
 export interface RelativeReward {
