@@ -1,7 +1,12 @@
-import { cloneAgent } from "../agents";
+import { cloneAgent, deserializeAgent } from "../agents";
+import { evaluate } from "../game/evaluate";
 import { TrainingCycleOptions } from "../game/types";
 import { NamedAgent, RelativeReward } from "../types/state";
-import { evaluate } from "../game/evaluate";
+import TrainingWorker from "./workers/trainingWorker/trainingWorker.importable";
+import {
+  TrainingWorkerMessageType,
+  TrainingWorkerNotification,
+} from "./workers/trainingWorker/types";
 
 export function trainAsync(
   traineeSource: NamedAgent,
@@ -114,7 +119,7 @@ function trainOnWorker(
   trainee: NamedAgent,
   opponents: NamedAgent[],
   trainingCycles: number,
-  options: TrainingCycleOptions,
+  trainingCycleOptions: TrainingCycleOptions,
   onCycleComplete: (
     cycleNumber: number,
     trainee: NamedAgent,
@@ -122,5 +127,46 @@ function trainOnWorker(
     terminateTraining: () => void
   ) => void
 ): void {
-  // TODO
+  const worker = new TrainingWorker();
+  const terminateWorker = worker.terminate.bind(worker);
+
+  worker.addEventListener("message", (event) => {
+    const notification: TrainingWorkerNotification = event.data;
+    switch (notification.messageType) {
+      case TrainingWorkerMessageType.CycleComplete: {
+        const { namedTraineeBuffer } = notification;
+        const trainee = {
+          name: namedTraineeBuffer.agentName,
+          agent: deserializeAgent(namedTraineeBuffer.buffer),
+        };
+        const { relativeRewards } = notification;
+
+        onCycleComplete(
+          notification.cycleNumber,
+          trainee,
+          relativeRewards,
+          terminateWorker
+        );
+        break;
+      }
+      case TrainingWorkerMessageType.Done:
+        terminateWorker();
+        break;
+    }
+  });
+
+  worker.postMessage({
+    messageType: TrainingWorkerMessageType.Start,
+
+    namedTraineeBuffer: {
+      agentName: trainee.name,
+      buffer: trainee.agent.toArrayBuffer(),
+    },
+    namedOpponentBuffers: opponents.map(({ name: agentName, agent }) => ({
+      agentName,
+      buffer: agent.toArrayBuffer(),
+    })),
+    trainingCycles,
+    trainingCycleOptions,
+  });
 }
