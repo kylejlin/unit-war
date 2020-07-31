@@ -15,9 +15,9 @@ export function evaluate(
       aTotal += aReward;
       bTotal -= aReward;
     } else {
-      const aReward = getLeaderReward(b, a, ante);
-      aTotal += aReward;
-      bTotal -= aReward;
+      const bReward = getLeaderReward(b, a, ante);
+      bTotal += bReward;
+      aTotal -= bReward;
     }
   }
 
