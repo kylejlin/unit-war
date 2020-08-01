@@ -202,6 +202,7 @@ export interface GraphState {
   options: AppOptions;
 
   graphedAgentName: string;
+  noiseInputValue: string;
   graph: PolicyGraph;
 }
 
@@ -215,16 +216,27 @@ export enum PolicyGraphType {
 export interface LeaderGraph {
   policyGraphType: PolicyGraphType.Leader;
 
-  points: [number, number, number][];
   noise: number;
-  inspectedStrength: number;
+  inspectedPoint: undefined | LeaderPolicyPoint;
+}
+
+export interface LeaderPolicyPoint {
+  strength: number;
+
+  initialBet: number;
+  maxBet: number;
 }
 
 export interface FollowerGraph {
   policyGraphType: PolicyGraphType.Follower;
 
-  points: [number, number, number][];
   noise: number;
-  inspectedStrength: number;
-  inspectedInitialBet: number;
+  inspectedPoint: undefined | FollowerPolicyPoint;
+}
+
+export interface FollowerPolicyPoint {
+  strength: number;
+  initialBet: number;
+
+  followingBet: number;
 }

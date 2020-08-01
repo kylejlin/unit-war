@@ -58,10 +58,10 @@ export class AgentArtichoke implements Agent {
     return this.leaderNetwork.evaluate(inputs);
   }
 
-  follow(strength: number, initialBid: number, noise: number): number {
+  follow(strength: number, initialBet: number, noise: number): number {
     const { inputs } = this;
     inputs[0] = strength;
-    inputs[1] = initialBid;
+    inputs[1] = initialBet;
     inputs[2] = noise;
     return this.followerNetwork.evaluate(inputs)[0];
   }

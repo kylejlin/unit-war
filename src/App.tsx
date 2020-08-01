@@ -11,7 +11,7 @@ import {
 import { ArtichokeCreationOptions } from "./agents/artichoke";
 import "./App.css";
 import * as arraySet from "./arraySet";
-import { Agent } from "./game/types";
+import { getAgent } from "./getAgent";
 import {
   isOnInclusiveUnitInterval,
   isPositiveFiniteNumber,
@@ -19,6 +19,7 @@ import {
 } from "./numberValidation";
 import { promisifiedEvaluate } from "./offloaders/evaluate";
 import { trainAsync } from "./offloaders/train";
+import { paintGraph } from "./paintGraph";
 import { shuffle } from "./random";
 import * as agentsSaver from "./stateSavers/agentsSaver";
 import {
@@ -38,6 +39,7 @@ import {
   NamedAgent,
   OptionsState,
   PlayState,
+  PolicyGraphType,
   RelativeReward,
   StateMap,
   StateType,
@@ -50,10 +52,14 @@ import {
 const DISPLAYED_DECIMALS = 3;
 
 export default class App extends React.Component<{}, AppState> {
+  private graphCanvasRef: React.RefObject<HTMLCanvasElement>;
+
   constructor(props: {}) {
     super(props);
 
     (window as any).app = this;
+
+    this.graphCanvasRef = React.createRef();
 
     this.state = getInitialState();
 
@@ -116,6 +122,18 @@ export default class App extends React.Component<{}, AppState> {
     this.onSelectAgentForDeletionClick = this.onSelectAgentForDeletionClick.bind(
       this
     );
+
+    this.onGraphedAgentNameChange = this.onGraphedAgentNameChange.bind(this);
+    this.onGraphTypeChange = this.onGraphTypeChange.bind(this);
+    this.onGraphNoiseChange = this.onGraphNoiseChange.bind(this);
+  }
+
+  componentDidUpdate() {
+    const { state } = this;
+    const canvas = this.graphCanvasRef.current;
+    if (state.stateType === StateType.Graph && canvas !== null) {
+      paintGraph(canvas, state);
+    }
   }
 
   expectState<T extends StateType>(expectedType: T): StateMap[T] {
@@ -158,9 +176,7 @@ export default class App extends React.Component<{}, AppState> {
   }
 
   renderAgentList(state: AgentListState): React.ReactElement {
-    const agents = state.agents
-      .slice()
-      .sort((a, b) => compareLexicographically(a.name, b.name));
+    const agents = getSortedAgents(state);
 
     return (
       <div className="App">
@@ -396,9 +412,7 @@ export default class App extends React.Component<{}, AppState> {
   }
 
   renderAgentDeletionMenu(state: AgentDeletionState): React.ReactElement {
-    const agents = state.agents
-      .slice()
-      .sort((a, b) => compareLexicographically(a.name, b.name));
+    const agents = getSortedAgents(state);
 
     return (
       <div className="App">
@@ -473,9 +487,7 @@ export default class App extends React.Component<{}, AppState> {
     state: EvaluationState
   ): React.ReactElement {
     const { selectedAgentNames } = state;
-    const agents = state.agents
-      .slice()
-      .sort((a, b) => compareLexicographically(a.name, b.name));
+    const agents = getSortedAgents(state);
 
     return (
       <div className="App">
@@ -572,9 +584,7 @@ export default class App extends React.Component<{}, AppState> {
   renderTrainingAgentSelectionMenu(
     state: TrainingAgentSelectionState
   ): React.ReactElement {
-    const agents = state.agents
-      .slice()
-      .sort((a, b) => compareLexicographically(a.name, b.name));
+    const agents = getSortedAgents(state);
 
     return (
       <div className="App">
@@ -635,9 +645,7 @@ export default class App extends React.Component<{}, AppState> {
   }
 
   renderTrainingCompleteMenu(state: TrainingState): React.ReactElement {
-    const agents = state.agents
-      .slice()
-      .sort((a, b) => compareLexicographically(a.name, b.name));
+    const agents = getSortedAgents(state);
     const { hands } = state.options.trainingCycleOptions.evaluationOptions;
     const opponents = state.opponentNames.map((opponentName) => ({
       name: opponentName,
@@ -694,9 +702,7 @@ export default class App extends React.Component<{}, AppState> {
   }
 
   renderTrainingTerminatedMenu(state: TrainingState): React.ReactElement {
-    const agents = state.agents
-      .slice()
-      .sort((a, b) => compareLexicographically(a.name, b.name));
+    const agents = getSortedAgents(state);
     const { hands } = state.options.trainingCycleOptions.evaluationOptions;
     const opponents = state.opponentNames.map((opponentName) => ({
       name: opponentName,
@@ -753,9 +759,7 @@ export default class App extends React.Component<{}, AppState> {
   }
 
   renderTrainingInProgressMenu(state: TrainingState): React.ReactElement {
-    const agents = state.agents
-      .slice()
-      .sort((a, b) => compareLexicographically(a.name, b.name));
+    const agents = getSortedAgents(state);
     const { hands } = state.options.trainingCycleOptions.evaluationOptions;
     const opponents = state.opponentNames.map((opponentName) => ({
       name: opponentName,
@@ -816,7 +820,84 @@ export default class App extends React.Component<{}, AppState> {
   }
 
   renderGraphMenu(state: GraphState): React.ReactElement {
-    return <div className="App"></div>;
+    const agents = getSortedAgents(state);
+    return (
+      <div className="App">
+        <section>
+          <button onClick={this.onAgentListClick}>Back</button>
+          <h2>Graph</h2>
+        </section>
+
+        <label>
+          Agent:{" "}
+          <select
+            value={state.graphedAgentName}
+            onChange={this.onGraphedAgentNameChange}
+          >
+            {agents.map(({ name: agentName, agent }) => (
+              <option key={agentName} value={agentName}>
+                {agentName} ({getAgentTypeDisplayString(agent.agentType)})
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          Component:{" "}
+          <select
+            value={state.graph.policyGraphType}
+            onChange={this.onGraphTypeChange}
+          >
+            <option value={PolicyGraphType.Leader}>Leader</option>
+            <option value={PolicyGraphType.Follower}>Follower</option>
+          </select>
+        </label>
+
+        <label>
+          Noise:{" "}
+          <input
+            className={
+              +state.noiseInputValue === 1
+                ? "DiscouragedInput"
+                : isOnInclusiveUnitInterval(+state.noiseInputValue)
+                ? ""
+                : "InvalidInput"
+            }
+            type="text"
+            value={state.noiseInputValue}
+            onChange={this.onGraphNoiseChange}
+          />
+          <input
+            className={
+              isOnInclusiveUnitInterval(+state.noiseInputValue)
+                ? ""
+                : "InvalidInput"
+            }
+            type="range"
+            min={0}
+            max={1}
+            step={0.001}
+            value={state.graph.noise}
+            onChange={this.onGraphNoiseChange}
+          />
+        </label>
+
+        <table>
+          <tbody>
+            <tr>
+              <td>Bet</td>
+              <td>
+                <canvas className="PolicyGraph" ref={this.graphCanvasRef} />
+              </td>
+            </tr>
+            <tr>
+              <td />
+              <td>Strength</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    );
   }
 
   onOptionsClick(): void {
@@ -900,7 +981,25 @@ export default class App extends React.Component<{}, AppState> {
   }
 
   onGraphClick(): void {
-    // TODO
+    const { state } = this;
+
+    const noise = Math.random();
+    const newState: GraphState = {
+      stateType: StateType.Graph,
+
+      agents: state.agents,
+      options: state.options,
+
+      graphedAgentName: state.agents[0].name,
+      noiseInputValue: "" + noise,
+      graph: {
+        policyGraphType: PolicyGraphType.Leader,
+
+        noise,
+        inspectedPoint: undefined,
+      },
+    };
+    this.setState(newState);
   }
 
   onAgentListClick(): void {
@@ -1391,6 +1490,47 @@ export default class App extends React.Component<{}, AppState> {
     };
     this.setState(newState);
   }
+
+  onGraphedAgentNameChange(event: React.ChangeEvent<HTMLSelectElement>): void {
+    const state = this.expectState(StateType.Graph);
+    const newState: GraphState = {
+      ...state,
+      graphedAgentName: event.target.value,
+      graph: { ...state.graph, inspectedPoint: undefined },
+    };
+    this.setState(newState);
+  }
+
+  onGraphTypeChange(event: React.ChangeEvent<HTMLSelectElement>): void {
+    const state = this.expectState(StateType.Graph);
+    const policyGraphType: PolicyGraphType = +event.target.value;
+    const newState: GraphState = {
+      ...state,
+      graph: {
+        policyGraphType,
+
+        noise: state.graph.noise,
+        inspectedPoint: undefined,
+      },
+    };
+    this.setState(newState);
+  }
+
+  onGraphNoiseChange(event: React.ChangeEvent<HTMLInputElement>): void {
+    const noiseInputValue = event.target.value;
+    const isNoiseValid = isOnInclusiveUnitInterval(+noiseInputValue);
+
+    const state = this.expectState(StateType.Graph);
+    const newState: GraphState = {
+      ...state,
+      noiseInputValue,
+      graph: {
+        ...state.graph,
+        noise: isNoiseValid ? +noiseInputValue : state.graph.noise,
+      },
+    };
+    this.setState(newState);
+  }
 }
 
 function getInitialState(): AppState {
@@ -1418,6 +1558,12 @@ function getDefaultAppOptions(): AppOptions {
     },
     useMainThreadForExpensiveComputation: false,
   };
+}
+
+function getSortedAgents(state: AppState): NamedAgent[] {
+  return state.agents
+    .slice()
+    .sort((a, b) => compareLexicographically(a.name, b.name));
 }
 
 /**
@@ -1522,21 +1668,6 @@ function withPropertyValuesParsedAsNumbers<T>(obj: T): WithNumberValues<T> {
     out[key] = +obj[key];
   }
   return out;
-}
-
-function getAgent(agents: NamedAgent[], expectedName: string): Agent {
-  for (const { name, agent } of agents) {
-    if (expectedName === name) {
-      return agent;
-    }
-  }
-
-  throw new Error(
-    "Cannot find agent named " +
-      JSON.stringify(expectedName) +
-      ". The only agents provided were: " +
-      JSON.stringify(agents)
-  );
 }
 
 function getNamedAgent(agents: NamedAgent[], expectedName: string): NamedAgent {

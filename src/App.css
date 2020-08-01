@@ -11,3 +11,8 @@
 .Unnumbered {
   list-style: none;
 }
+
+.PolicyGraph {
+  border: 1px solid grey;
+  max-height: calc(0.8 * var(--minor-axis));
+}
