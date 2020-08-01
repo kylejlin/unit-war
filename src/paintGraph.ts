@@ -9,12 +9,17 @@ import {
   PolicyGraphType,
 } from "./types/state";
 
+interface LeaderPolicyPointWithUnadjustedMaxBet extends LeaderPolicyPoint {
+  unadjustedMaxBet: number;
+}
+
 export const CANVAS_SIZE = 800;
 
 const SAMPLES = 20;
 const STEP = 1 / SAMPLES;
 const LINE_WIDTH = 3;
 const INITIAL_BET_LINE_STYLE = "#ff000088";
+const UNADJUSTED_MAX_BET_LINE_STYLE = "#00880088";
 const MAX_BET_LINE_STYLE = "#0000ff88";
 
 export function paintGraph(canvas: HTMLCanvasElement, state: GraphState): void {
@@ -46,6 +51,20 @@ function paintLeaderGraph(
 
   ctx.lineWidth = LINE_WIDTH;
 
+  const initialUnadjustedMaxBet0Y =
+    CANVAS_SIZE - CANVAS_SIZE * points[0].unadjustedMaxBet;
+  ctx.beginPath();
+  ctx.moveTo(0, initialUnadjustedMaxBet0Y);
+
+  for (let i = 1; i < points.length; i++) {
+    const point = points[i];
+    const x = CANVAS_SIZE * point.strength;
+    const y = CANVAS_SIZE - CANVAS_SIZE * point.unadjustedMaxBet;
+    ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = UNADJUSTED_MAX_BET_LINE_STYLE;
+  ctx.stroke();
+
   const initialBet0Y = CANVAS_SIZE - CANVAS_SIZE * points[0].initialBet;
   ctx.beginPath();
   ctx.moveTo(0, initialBet0Y);
@@ -76,25 +95,38 @@ function paintLeaderGraph(
 function getLeaderPolicyPoints(
   agent: Agent,
   noise: number
-): LeaderPolicyPoint[] {
+): LeaderPolicyPointWithUnadjustedMaxBet[] {
   const x0Arr = agent.lead(0, noise);
   const x0InitialBet = x0Arr[0];
-  const x0MaxBet = Math.max(x0InitialBet, x0Arr[1]);
-  const points: LeaderPolicyPoint[] = [
-    { strength: 0, initialBet: x0InitialBet, maxBet: x0MaxBet },
+  const x0UnadjustedMaxBet = x0Arr[1];
+  const x0MaxBet = Math.max(x0InitialBet, x0UnadjustedMaxBet);
+  const points: LeaderPolicyPointWithUnadjustedMaxBet[] = [
+    {
+      strength: 0,
+      initialBet: x0InitialBet,
+      maxBet: x0MaxBet,
+      unadjustedMaxBet: x0UnadjustedMaxBet,
+    },
   ];
 
   for (let strength = STEP; strength < 1; strength += STEP) {
     const arr = agent.lead(strength, noise);
     const initialBet = arr[0];
-    const maxBet = Math.max(initialBet, arr[1]);
-    points.push({ strength, initialBet, maxBet });
+    const unadjustedMaxBet = arr[1];
+    const maxBet = Math.max(initialBet, unadjustedMaxBet);
+    points.push({ strength, initialBet, maxBet, unadjustedMaxBet });
   }
 
   const x1Arr = agent.lead(1, noise);
   const x1InitialBet = x1Arr[0];
-  const x1MaxBet = Math.max(x1InitialBet, x1Arr[1]);
-  points.push({ strength: 1, initialBet: x1InitialBet, maxBet: x1MaxBet });
+  const x1UnadjustedMaxBet = x1Arr[1];
+  const x1MaxBet = Math.max(x1InitialBet, x1UnadjustedMaxBet);
+  points.push({
+    strength: 1,
+    initialBet: x1InitialBet,
+    maxBet: x1MaxBet,
+    unadjustedMaxBet: x1UnadjustedMaxBet,
+  });
 
   return points;
 }
