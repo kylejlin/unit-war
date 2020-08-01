@@ -380,11 +380,12 @@ export default class App extends React.Component<{}, AppState> {
     );
   }
 
-  renderAgentParams(state: AgentCreationState): React.ReactElement {
-    const inputValues: WithStringValues<ArtichokeCreationOptions> =
-      state.agentCreationOptionInputValues;
+  renderAgentParams(state: AgentCreationState): React.ReactElement | null {
     switch (state.agentType) {
-      case AgentType.Artichoke:
+      case AgentType.Artichoke: {
+        const inputValues = state.agentCreationOptionInputValues as WithStringValues<
+          ArtichokeCreationOptions
+        >;
         return (
           <section>
             <h3>Agent options</h3>
@@ -397,7 +398,7 @@ export default class App extends React.Component<{}, AppState> {
                     : "InvalidInput"
                 }
                 type="text"
-                value={state.agentCreationOptionInputValues.hiddenLayerSize}
+                value={inputValues.hiddenLayerSize}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   this.changeAgentCreationOptionInputValue(
                     "hiddenLayerSize",
@@ -408,6 +409,10 @@ export default class App extends React.Component<{}, AppState> {
             </label>
           </section>
         );
+      }
+
+      case AgentType.Broccoli:
+        return null;
     }
   }
 
@@ -1219,8 +1224,8 @@ export default class App extends React.Component<{}, AppState> {
     this.setState(newState);
   }
 
-  changeAgentCreationOptionInputValue(
-    optionName: keyof AgentCreationOptions,
+  changeAgentCreationOptionInputValue<T extends AgentCreationOptions>(
+    optionName: keyof T,
     value: string
   ): void {
     const state = this.expectState(StateType.AgentCreation);

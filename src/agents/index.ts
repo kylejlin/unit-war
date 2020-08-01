@@ -4,14 +4,25 @@ import {
   areArtichokeCreationOptionsValid,
   ArtichokeCreationOptions,
 } from "./artichoke";
+import {
+  AgentBroccoli,
+  areBroccoliOptionsValid,
+  BroccoliCreationOptions,
+} from "./broccoli";
 
 export enum AgentType {
   Artichoke = 1,
+  Broccoli = 2,
 }
 
-export type AgentCreationOptions = ArtichokeCreationOptions;
+export type AgentCreationOptions =
+  | ArtichokeCreationOptions
+  | BroccoliCreationOptions;
 
-export const ALL_AGENT_TYPES: AgentType[] = [AgentType.Artichoke];
+export const ALL_AGENT_TYPES: AgentType[] = [
+  AgentType.Artichoke,
+  AgentType.Broccoli,
+];
 
 export function deserializeAgent(buffer: ArrayBuffer): Agent {
   const agentType = new Float64Array(buffer)[0];
@@ -19,6 +30,8 @@ export function deserializeAgent(buffer: ArrayBuffer): Agent {
   switch (agentType) {
     case AgentType.Artichoke:
       return AgentArtichoke.fromArrayBuffer(buffer);
+    case AgentType.Broccoli:
+      return AgentBroccoli.fromArrayBuffer(buffer);
 
     default:
       throw new TypeError("Cannot recognize AgentType: " + agentType);
@@ -31,7 +44,13 @@ export function createAgent(
 ): Agent {
   switch (agentType) {
     case AgentType.Artichoke:
-      return AgentArtichoke.fromCreationOptions(creationOptions);
+      return AgentArtichoke.fromCreationOptions(
+        creationOptions as ArtichokeCreationOptions
+      );
+    case AgentType.Broccoli:
+      return AgentBroccoli.fromCreationOptions(
+        creationOptions as BroccoliCreationOptions
+      );
   }
 }
 
@@ -45,6 +64,8 @@ export function getDefaultAgentCreationOptions(
   switch (agentType) {
     case AgentType.Artichoke:
       return { hiddenLayerSize: 16 };
+    case AgentType.Broccoli:
+      return {};
   }
 }
 
@@ -57,6 +78,8 @@ export function areAgentCreationOptionsValid(
       return areArtichokeCreationOptionsValid(
         options as ArtichokeCreationOptions
       );
+    case AgentType.Broccoli:
+      return areBroccoliOptionsValid(options as BroccoliCreationOptions);
   }
 }
 
