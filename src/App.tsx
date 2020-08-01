@@ -9,6 +9,7 @@ import {
   getDefaultAgentCreationOptions,
 } from "./agents";
 import { ArtichokeCreationOptions } from "./agents/artichoke";
+import { DaikonCreationOptions } from "./agents/daikon";
 import "./App.css";
 import * as arraySet from "./arraySet";
 import { getAgent } from "./getAgent";
@@ -416,6 +417,35 @@ export default class App extends React.Component<{}, AppState> {
 
       case AgentType.Carrot:
         return null;
+
+      case AgentType.Daikon: {
+        const inputValues = state.agentCreationOptionInputValues as WithStringValues<
+          DaikonCreationOptions
+        >;
+        return (
+          <section>
+            <h3>Agent options</h3>
+            <label>
+              Bet:{" "}
+              <input
+                className={
+                  isOnInclusiveUnitInterval(+inputValues.bet)
+                    ? ""
+                    : "InvalidInput"
+                }
+                type="text"
+                value={inputValues.bet}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  this.changeAgentCreationOptionInputValue(
+                    "bet",
+                    event.target.value
+                  )
+                }
+              />
+            </label>
+          </section>
+        );
+      }
     }
   }
 
