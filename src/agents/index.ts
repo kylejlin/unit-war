@@ -9,10 +9,16 @@ import {
   areBroccoliOptionsValid,
   BroccoliCreationOptions,
 } from "./broccoli";
+import {
+  AgentCarrot,
+  areCarrotOptionsValid,
+  CarrotCreationOptions,
+} from "./carrot";
 
 export enum AgentType {
   Artichoke = 1,
   Broccoli = 2,
+  Carrot = 3,
 }
 
 export type AgentCreationOptions =
@@ -22,6 +28,7 @@ export type AgentCreationOptions =
 export const ALL_AGENT_TYPES: AgentType[] = [
   AgentType.Artichoke,
   AgentType.Broccoli,
+  AgentType.Carrot,
 ];
 
 export function deserializeAgent(buffer: ArrayBuffer): Agent {
@@ -32,6 +39,8 @@ export function deserializeAgent(buffer: ArrayBuffer): Agent {
       return AgentArtichoke.fromArrayBuffer(buffer);
     case AgentType.Broccoli:
       return AgentBroccoli.fromArrayBuffer(buffer);
+    case AgentType.Carrot:
+      return AgentCarrot.fromArrayBuffer(buffer);
 
     default:
       throw new TypeError("Cannot recognize AgentType: " + agentType);
@@ -51,6 +60,10 @@ export function createAgent(
       return AgentBroccoli.fromCreationOptions(
         creationOptions as BroccoliCreationOptions
       );
+    case AgentType.Carrot:
+      return AgentCarrot.fromCreationOptions(
+        creationOptions as CarrotCreationOptions
+      );
   }
 }
 
@@ -66,6 +79,8 @@ export function getDefaultAgentCreationOptions(
       return { hiddenLayerSize: 16 };
     case AgentType.Broccoli:
       return {};
+    case AgentType.Carrot:
+      return {};
   }
 }
 
@@ -80,6 +95,8 @@ export function areAgentCreationOptionsValid(
       );
     case AgentType.Broccoli:
       return areBroccoliOptionsValid(options as BroccoliCreationOptions);
+    case AgentType.Carrot:
+      return areCarrotOptionsValid(options as CarrotCreationOptions);
   }
 }
 

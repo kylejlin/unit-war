@@ -413,6 +413,9 @@ export default class App extends React.Component<{}, AppState> {
 
       case AgentType.Broccoli:
         return null;
+
+      case AgentType.Carrot:
+        return null;
     }
   }
 
