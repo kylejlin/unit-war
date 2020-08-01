@@ -449,6 +449,35 @@ export default class App extends React.Component<{}, AppState> {
 
       case AgentType.Eggplant:
         return null;
+
+      case AgentType.Fig: {
+        const inputValues = state.agentCreationOptionInputValues as WithStringValues<
+          ArtichokeCreationOptions
+        >;
+        return (
+          <section>
+            <h3>Agent options</h3>
+            <label>
+              Hidden neurons:{" "}
+              <input
+                className={
+                  isPositiveInteger(+inputValues.hiddenLayerSize)
+                    ? ""
+                    : "InvalidInput"
+                }
+                type="text"
+                value={inputValues.hiddenLayerSize}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  this.changeAgentCreationOptionInputValue(
+                    "hiddenLayerSize",
+                    event.target.value
+                  )
+                }
+              />
+            </label>
+          </section>
+        );
+      }
     }
   }
 

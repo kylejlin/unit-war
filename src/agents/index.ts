@@ -21,9 +21,14 @@ import {
 } from "./daikon";
 import {
   AgentEggplant,
-  EggplantCreationOptions,
   areEggplantOptionsValid,
+  EggplantCreationOptions,
 } from "./eggplant";
+import {
+  AgentFig,
+  areFigCreationOptionsValid,
+  FigCreationOptions,
+} from "./fig";
 
 export enum AgentType {
   Artichoke = 1,
@@ -31,11 +36,16 @@ export enum AgentType {
   Carrot = 3,
   Daikon = 4,
   Eggplant = 5,
+  Fig = 6,
 }
 
 export type AgentCreationOptions =
   | ArtichokeCreationOptions
-  | BroccoliCreationOptions;
+  | BroccoliCreationOptions
+  | CarrotCreationOptions
+  | DaikonCreationOptions
+  | EggplantCreationOptions
+  | FigCreationOptions;
 
 export const ALL_AGENT_TYPES: AgentType[] = [
   AgentType.Artichoke,
@@ -43,6 +53,7 @@ export const ALL_AGENT_TYPES: AgentType[] = [
   AgentType.Carrot,
   AgentType.Daikon,
   AgentType.Eggplant,
+  AgentType.Fig,
 ];
 
 export function deserializeAgent(buffer: ArrayBuffer): Agent {
@@ -74,6 +85,8 @@ function deserializeAgentOfType(
       return AgentDaikon.fromArrayBuffer(buffer);
     case AgentType.Eggplant:
       return AgentEggplant.fromArrayBuffer(buffer);
+    case AgentType.Fig:
+      return AgentFig.fromArrayBuffer(buffer);
   }
 }
 
@@ -102,6 +115,10 @@ export function createAgent(
       return AgentEggplant.fromCreationOptions(
         creationOptions as EggplantCreationOptions
       );
+    case AgentType.Fig:
+      return AgentFig.fromCreationOptions(
+        creationOptions as FigCreationOptions
+      );
   }
 }
 
@@ -123,6 +140,8 @@ export function getDefaultAgentCreationOptions(
       return { bet: 0.5 };
     case AgentType.Eggplant:
       return {};
+    case AgentType.Fig:
+      return { hiddenLayerSize: 16 };
   }
 }
 
@@ -143,6 +162,8 @@ export function areAgentCreationOptionsValid(
       return areDaikonOptionsValid(options as DaikonCreationOptions);
     case AgentType.Eggplant:
       return areEggplantOptionsValid(options as EggplantCreationOptions);
+    case AgentType.Fig:
+      return areFigCreationOptionsValid(options as FigCreationOptions);
   }
 }
 
