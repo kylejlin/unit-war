@@ -19,12 +19,18 @@ import {
   areDaikonOptionsValid,
   DaikonCreationOptions,
 } from "./daikon";
+import {
+  AgentEggplant,
+  EggplantCreationOptions,
+  areEggplantOptionsValid,
+} from "./eggplant";
 
 export enum AgentType {
   Artichoke = 1,
   Broccoli = 2,
   Carrot = 3,
   Daikon = 4,
+  Eggplant = 5,
 }
 
 export type AgentCreationOptions =
@@ -36,11 +42,27 @@ export const ALL_AGENT_TYPES: AgentType[] = [
   AgentType.Broccoli,
   AgentType.Carrot,
   AgentType.Daikon,
+  AgentType.Eggplant,
 ];
 
 export function deserializeAgent(buffer: ArrayBuffer): Agent {
   const agentType = new Float64Array(buffer)[0];
 
+  if (isValidAgentType(agentType)) {
+    return deserializeAgentOfType(buffer, agentType);
+  } else {
+    throw new TypeError("Cannot recognize AgentType: " + agentType);
+  }
+}
+
+function isValidAgentType(n: number): n is AgentType {
+  return ALL_AGENT_TYPES.includes(n);
+}
+
+function deserializeAgentOfType(
+  buffer: ArrayBuffer,
+  agentType: AgentType
+): Agent {
   switch (agentType) {
     case AgentType.Artichoke:
       return AgentArtichoke.fromArrayBuffer(buffer);
@@ -50,9 +72,8 @@ export function deserializeAgent(buffer: ArrayBuffer): Agent {
       return AgentCarrot.fromArrayBuffer(buffer);
     case AgentType.Daikon:
       return AgentDaikon.fromArrayBuffer(buffer);
-
-    default:
-      throw new TypeError("Cannot recognize AgentType: " + agentType);
+    case AgentType.Eggplant:
+      return AgentEggplant.fromArrayBuffer(buffer);
   }
 }
 
@@ -77,6 +98,10 @@ export function createAgent(
       return AgentDaikon.fromCreationOptions(
         creationOptions as DaikonCreationOptions
       );
+    case AgentType.Eggplant:
+      return AgentEggplant.fromCreationOptions(
+        creationOptions as EggplantCreationOptions
+      );
   }
 }
 
@@ -96,6 +121,8 @@ export function getDefaultAgentCreationOptions(
       return {};
     case AgentType.Daikon:
       return { bet: 0.5 };
+    case AgentType.Eggplant:
+      return {};
   }
 }
 
@@ -114,6 +141,8 @@ export function areAgentCreationOptionsValid(
       return areCarrotOptionsValid(options as CarrotCreationOptions);
     case AgentType.Daikon:
       return areDaikonOptionsValid(options as DaikonCreationOptions);
+    case AgentType.Eggplant:
+      return areEggplantOptionsValid(options as EggplantCreationOptions);
   }
 }
 

@@ -446,6 +446,9 @@ export default class App extends React.Component<{}, AppState> {
           </section>
         );
       }
+
+      case AgentType.Eggplant:
+        return null;
     }
   }
 
