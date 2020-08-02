@@ -29,6 +29,11 @@ import {
   areFigCreationOptionsValid,
   FigCreationOptions,
 } from "./fig";
+import {
+  AgentGrape,
+  areGrapeCreationOptionsValid,
+  GrapeCreationOptions,
+} from "./grape";
 
 export enum AgentType {
   Artichoke = 1,
@@ -37,6 +42,7 @@ export enum AgentType {
   Daikon = 4,
   Eggplant = 5,
   Fig = 6,
+  Grape = 7,
 }
 
 export type AgentCreationOptions =
@@ -45,7 +51,8 @@ export type AgentCreationOptions =
   | CarrotCreationOptions
   | DaikonCreationOptions
   | EggplantCreationOptions
-  | FigCreationOptions;
+  | FigCreationOptions
+  | GrapeCreationOptions;
 
 export const ALL_AGENT_TYPES: AgentType[] = [
   AgentType.Artichoke,
@@ -54,6 +61,7 @@ export const ALL_AGENT_TYPES: AgentType[] = [
   AgentType.Daikon,
   AgentType.Eggplant,
   AgentType.Fig,
+  AgentType.Grape,
 ];
 
 export function deserializeAgent(buffer: ArrayBuffer): Agent {
@@ -87,6 +95,8 @@ function deserializeAgentOfType(
       return AgentEggplant.fromArrayBuffer(buffer);
     case AgentType.Fig:
       return AgentFig.fromArrayBuffer(buffer);
+    case AgentType.Grape:
+      return AgentGrape.fromArrayBuffer(buffer);
   }
 }
 
@@ -119,6 +129,10 @@ export function createAgent(
       return AgentFig.fromCreationOptions(
         creationOptions as FigCreationOptions
       );
+    case AgentType.Grape:
+      return AgentGrape.fromCreationOptions(
+        creationOptions as GrapeCreationOptions
+      );
   }
 }
 
@@ -142,6 +156,8 @@ export function getDefaultAgentCreationOptions(
       return {};
     case AgentType.Fig:
       return { hiddenLayerSize: 16 };
+    case AgentType.Grape:
+      return { hiddenLayerSize: 16 };
   }
 }
 
@@ -164,6 +180,8 @@ export function areAgentCreationOptionsValid(
       return areEggplantOptionsValid(options as EggplantCreationOptions);
     case AgentType.Fig:
       return areFigCreationOptionsValid(options as FigCreationOptions);
+    case AgentType.Grape:
+      return areGrapeCreationOptionsValid(options as GrapeCreationOptions);
   }
 }
 
