@@ -34,6 +34,11 @@ import {
   areGrapeCreationOptionsValid,
   GrapeCreationOptions,
 } from "./grape";
+import {
+  AgentHabanero,
+  areHabaneroCreationOptionsValid,
+  HabaneroCreationOptions,
+} from "./habanero";
 
 export enum AgentType {
   Artichoke = 1,
@@ -43,6 +48,7 @@ export enum AgentType {
   Eggplant = 5,
   Fig = 6,
   Grape = 7,
+  Habanero = 8,
 }
 
 export type AgentCreationOptions =
@@ -52,7 +58,8 @@ export type AgentCreationOptions =
   | DaikonCreationOptions
   | EggplantCreationOptions
   | FigCreationOptions
-  | GrapeCreationOptions;
+  | GrapeCreationOptions
+  | HabaneroCreationOptions;
 
 export const ALL_AGENT_TYPES: AgentType[] = [
   AgentType.Artichoke,
@@ -62,6 +69,7 @@ export const ALL_AGENT_TYPES: AgentType[] = [
   AgentType.Eggplant,
   AgentType.Fig,
   AgentType.Grape,
+  AgentType.Habanero,
 ];
 
 export function deserializeAgent(buffer: ArrayBuffer): Agent {
@@ -97,6 +105,8 @@ function deserializeAgentOfType(
       return AgentFig.fromArrayBuffer(buffer);
     case AgentType.Grape:
       return AgentGrape.fromArrayBuffer(buffer);
+    case AgentType.Habanero:
+      return AgentHabanero.fromArrayBuffer(buffer);
   }
 }
 
@@ -133,6 +143,10 @@ export function createAgent(
       return AgentGrape.fromCreationOptions(
         creationOptions as GrapeCreationOptions
       );
+    case AgentType.Habanero:
+      return AgentHabanero.fromCreationOptions(
+        creationOptions as HabaneroCreationOptions
+      );
   }
 }
 
@@ -158,6 +172,8 @@ export function getDefaultAgentCreationOptions(
       return { hiddenLayerSize: 16 };
     case AgentType.Grape:
       return { hiddenLayerSize: 16 };
+    case AgentType.Habanero:
+      return { hiddenLayerSize: 16 };
   }
 }
 
@@ -182,6 +198,10 @@ export function areAgentCreationOptionsValid(
       return areFigCreationOptionsValid(options as FigCreationOptions);
     case AgentType.Grape:
       return areGrapeCreationOptionsValid(options as GrapeCreationOptions);
+    case AgentType.Habanero:
+      return areHabaneroCreationOptionsValid(
+        options as HabaneroCreationOptions
+      );
   }
 }
 

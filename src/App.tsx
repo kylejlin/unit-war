@@ -12,6 +12,7 @@ import { ArtichokeCreationOptions } from "./agents/artichoke";
 import { DaikonCreationOptions } from "./agents/daikon";
 import { FigCreationOptions } from "./agents/fig";
 import { GrapeCreationOptions } from "./agents/grape";
+import { HabaneroCreationOptions } from "./agents/habanero";
 import "./App.css";
 import * as arraySet from "./arraySet";
 import { getAgent } from "./getAgent";
@@ -484,6 +485,35 @@ export default class App extends React.Component<{}, AppState> {
       case AgentType.Grape: {
         const inputValues = state.agentCreationOptionInputValues as WithStringValues<
           GrapeCreationOptions
+        >;
+        return (
+          <section>
+            <h3>Agent options</h3>
+            <label>
+              Hidden neurons:{" "}
+              <input
+                className={
+                  isPositiveInteger(+inputValues.hiddenLayerSize)
+                    ? ""
+                    : "InvalidInput"
+                }
+                type="text"
+                value={inputValues.hiddenLayerSize}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  this.changeAgentCreationOptionInputValue(
+                    "hiddenLayerSize",
+                    event.target.value
+                  )
+                }
+              />
+            </label>
+          </section>
+        );
+      }
+
+      case AgentType.Habanero: {
+        const inputValues = state.agentCreationOptionInputValues as WithStringValues<
+          HabaneroCreationOptions
         >;
         return (
           <section>
