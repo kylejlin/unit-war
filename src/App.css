@@ -16,3 +16,15 @@
   border: 1px solid grey;
   max-height: calc(0.8 * var(--minor-axis));
 }
+
+.Key__InitialBet {
+  color: #ff0000;
+}
+
+.Key__UnclampedMaxBet {
+  color: #008800;
+}
+
+.Key__ClampedMaxBet {
+  color: #0000ff;
+}

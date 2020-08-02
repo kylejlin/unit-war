@@ -1027,6 +1027,24 @@ export default class App extends React.Component<{}, AppState> {
             </tr>
           </tbody>
         </table>
+
+        <section>
+          <h3>Key</h3>
+          {state.graph.policyGraphType === PolicyGraphType.Leader ? (
+            <>
+              <p className="Key__InitialBet">Red = initial bet</p>
+              <p className="Key__UnclampedMaxBet">Green = unclamped max bet</p>
+              <p className="Key__ClampedMaxBet">
+                Blue = clamped max bet = max(initial bet, unclamped max bet)
+              </p>
+            </>
+          ) : (
+            <>
+              <p>Lighter = lower bet (white = 0)</p>
+              <p>Darker = higher bet (black = 1)</p>
+            </>
+          )}
+        </section>
       </div>
     );
   }
