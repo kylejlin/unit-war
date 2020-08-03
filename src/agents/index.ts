@@ -151,7 +151,24 @@ export function createAgent(
 }
 
 export function getAgentTypeDisplayString(agentType: AgentType): string {
-  return AgentType[agentType];
+  switch (agentType) {
+    case AgentType.Artichoke:
+      return "Artichoke [Neural Network]";
+    case AgentType.Broccoli:
+      return "Broccoli [Random]";
+    case AgentType.Carrot:
+      return "Carrot [Value]";
+    case AgentType.Daikon:
+      return "Daikon [Constant]";
+    case AgentType.Eggplant:
+      return "Eggplant [Value]";
+    case AgentType.Fig:
+      return "Fig [Neural Network]";
+    case AgentType.Grape:
+      return "Grape [Neural Network]";
+    case AgentType.Habanero:
+      return "Habanero [Neural Network]";
+  }
 }
 
 export function getDefaultAgentCreationOptions(
