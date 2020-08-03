@@ -22,8 +22,8 @@ Each player starts off with 0 monetary units.
    2. The other player is the _follower_.
    3. Each player is assigned a randomly selected number from the interval `[0, 1]`. This number is referred to as the player's _strength_. Each player only knows their own strength, and does not know their opponent's strength.
    4. The leader must make an _initial bet_ on the interval `[ante, 1]`. The leader announces their initial bet to the follower.
-   5. The follower can either _fold_ (see Folding) or place a _following bet_ on the interval `[initial bet, 1]`. If the following bet equals the initial bet, the players _showdown_ using the initial bet (see Showdown). Otherwise, proceed to the next step.
-   6. The leader can either _call_ the following bet, or fold (see Folding). If the leader calls, the players showdown with the following bet (see Showdown).
+   5. The follower can either _fold_ (see **Folding**) or place a _following bet_ on the interval `[initial bet, 1]`. If the following bet equals the initial bet, the players _showdown_ using the initial bet (see **Showdown**). Otherwise, proceed to the next step.
+   6. The leader can either _call_ the following bet, or fold (see **Folding**). If the leader calls, the players showdown with the following bet (see **Showdown**).
    7. **Folding:** If a player folds, the current hand ends immediately. Money is awarded as follows:
       1. If the follower folds, the follower loses `ante` monetary units, and the leader gains `ante` monetary units.
       2. If the leader folds, the leader loses `initial bet` monetary units, and the follower gains `initial bet` monetary units.
@@ -59,7 +59,7 @@ Once the specified number of hands have been played, the player with more money 
 
 ### How to read evaluations
 
-An evaluation is displayed as a reward and a performance rating.
+An evaluation consists of a _reward_ and _performance rating_. The web app displays these two numbers in the following format: `"{reward} ({performance rating * 100}%)"`.
 
 For evaluating agent A against agent B, the equations for agent A's reward and performance are as follows:
 
