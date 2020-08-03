@@ -15,6 +15,7 @@ import { GrapeCreationOptions } from "./agents/grape";
 import { HabaneroCreationOptions } from "./agents/habanero";
 import "./App.css";
 import * as arraySet from "./arraySet";
+import { Agent } from "./game/types";
 import { getAgent } from "./getAgent";
 import {
   isOnInclusiveUnitInterval,
@@ -38,13 +39,22 @@ import {
   AppOptions,
   AppState,
   APP_OPTIONS_VERSION,
+  BetState,
+  BetStateType,
   EvaluationState,
+  Fold,
+  FollowingBetState,
+  GameAcknowledgeable,
+  GameAcknowledgeableType,
   GraphState,
+  InitialBetState,
+  MaxBetState,
   NamedAgent,
   OptionsState,
   PlayState,
   PolicyGraphType,
   RelativeReward,
+  Showdown,
   StateMap,
   StateType,
   TrainingAgentSelectionState,
@@ -54,6 +64,7 @@ import {
 } from "./types/state";
 
 const DISPLAYED_DECIMALS = 3;
+const DEFAULT_BET = 0.5;
 
 export default class App extends React.Component<{}, AppState> {
   private graphCanvasRef: React.RefObject<HTMLCanvasElement>;
@@ -126,6 +137,12 @@ export default class App extends React.Component<{}, AppState> {
     this.onSelectAgentForDeletionClick = this.onSelectAgentForDeletionClick.bind(
       this
     );
+
+    this.onOpponentNameChange = this.onOpponentNameChange.bind(this);
+    this.onBetInputValueChange = this.onBetInputValueChange.bind(this);
+    this.onPlaceBetClick = this.onPlaceBetClick.bind(this);
+    this.onFoldClick = this.onFoldClick.bind(this);
+    this.onAcknowledgeClick = this.onAcknowledgeClick.bind(this);
 
     this.onGraphedAgentNameChange = this.onGraphedAgentNameChange.bind(this);
     this.onGraphTypeChange = this.onGraphTypeChange.bind(this);
@@ -947,7 +964,265 @@ export default class App extends React.Component<{}, AppState> {
   }
 
   renderPlayMenu(state: PlayState): React.ReactElement {
-    return <div className="App"></div>;
+    const { betState, acknowledgeable } = state;
+    const { ante } = state.options.trainingCycleOptions.evaluationOptions;
+
+    let betStateOrAcknowledgementMenu: React.ReactElement;
+    if (acknowledgeable !== undefined) {
+      betStateOrAcknowledgementMenu = this.renderAcknowledgementMenu(
+        acknowledgeable
+      );
+    } else {
+      switch (betState.betStateType) {
+        case BetStateType.Initial:
+          betStateOrAcknowledgementMenu = this.renderInitialBetMenu(
+            betState,
+            ante
+          );
+          break;
+        case BetStateType.Following:
+          betStateOrAcknowledgementMenu = this.renderFollowingBetMenu(betState);
+          break;
+        case BetStateType.Max:
+          betStateOrAcknowledgementMenu = this.renderMaxBetMenu(betState);
+          break;
+      }
+    }
+
+    const agents = getSortedAgents(state);
+    return (
+      <div className="App">
+        <section>
+          <button onClick={this.onAgentListClick}>Quit</button>
+          <h2>Play</h2>
+        </section>
+
+        <section>
+          <label className="PlayMenuLabel">
+            Playing{" "}
+            <select
+              value={state.opponentName}
+              onChange={this.onOpponentNameChange}
+            >
+              {agents.map(({ name: agentName, agent }) => (
+                <option key={agentName} value={agentName}>
+                  {agentName} ({getAgentTypeDisplayString(agent.agentType)})
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="PlayMenuLabel">Hands played: {state.hands}</label>
+
+          <label className="PlayMenuLabel">
+            Reward: {state.reward.toFixed(DISPLAYED_DECIMALS)}
+          </label>
+
+          {state.hands === 0 ? (
+            <label className="PlayMenuLabel">Performance: 50.00%</label>
+          ) : (
+            <label className="PlayMenuLabel">
+              Performance:{" "}
+              {(
+                (100 * (state.reward + state.hands)) /
+                (2 * state.hands)
+              ).toFixed(2)}
+              %
+            </label>
+          )}
+        </section>
+
+        {betStateOrAcknowledgementMenu}
+      </div>
+    );
+  }
+
+  renderAcknowledgementMenu(
+    acknowledgeable: GameAcknowledgeable
+  ): React.ReactElement {
+    switch (acknowledgeable.acknowledgeableType) {
+      case GameAcknowledgeableType.Showdown:
+        return this.renderShowdownAcknowledgementMenu(acknowledgeable);
+      case GameAcknowledgeableType.Fold:
+        return this.renderFoldAcknowledgementMenu(acknowledgeable);
+    }
+  }
+
+  renderShowdownAcknowledgementMenu(
+    acknowledgeable: Showdown
+  ): React.ReactElement {
+    const {
+      strength: userStrength,
+      opponentStrength,
+      reward,
+    } = acknowledgeable;
+    if (reward > 0) {
+      return (
+        <section>
+          <p>You won {reward}.</p>
+          <p>Your strength: {userStrength}</p>
+          <p>Opponent strength: {opponentStrength}</p>
+          <button onClick={this.onAcknowledgeClick}>Continue</button>
+        </section>
+      );
+    } else if (reward < 0) {
+      return (
+        <section>
+          <p>You lost {-reward}.</p>
+          <p>Your strength: {userStrength}</p>
+          <p>Opponent strength: {opponentStrength}</p>
+          <button onClick={this.onAcknowledgeClick}>Continue</button>
+        </section>
+      );
+    } else {
+      return (
+        <section>
+          You and your opponent both had a strength of {userStrength}, so
+          nothing was won or lost.
+          <button onClick={this.onAcknowledgeClick}>Continue</button>
+        </section>
+      );
+    }
+  }
+
+  renderFoldAcknowledgementMenu(acknowledgeable: Fold): React.ReactElement {
+    const { reward } = acknowledgeable;
+    if (reward > 0) {
+      return (
+        <section>
+          <p>You won {reward} because your opponent folded.</p>
+          <button onClick={this.onAcknowledgeClick}>Continue</button>
+        </section>
+      );
+    } else {
+      return (
+        <section>
+          <p>You lost {-reward} by folding.</p>
+          <button onClick={this.onAcknowledgeClick}>Continue</button>
+        </section>
+      );
+    }
+  }
+
+  renderInitialBetMenu(
+    betState: InitialBetState,
+    ante: number
+  ): React.ReactElement {
+    return (
+      <section>
+        <h3>You are betting first.</h3>
+        <label className="BetMenuLabel">Strength: {betState.strength}</label>
+        <label className="BetMenuLabel">
+          Your initial bet:{" "}
+          <input
+            className={
+              isOnInclusiveUnitInterval(+betState.betInputValue) &&
+              +betState.betInputValue >= ante
+                ? ""
+                : "InvalidInput"
+            }
+            type="text"
+            value={betState.betInputValue}
+            onChange={this.onBetInputValueChange}
+          />
+          <input
+            className={
+              isOnInclusiveUnitInterval(+betState.betInputValue) &&
+              +betState.betInputValue >= ante
+                ? ""
+                : "InvalidInput"
+            }
+            type="range"
+            min={ante}
+            max={1}
+            step={0.001}
+            value={+betState.betInputValue}
+            onChange={this.onBetInputValueChange}
+          />
+        </label>
+        <button
+          disabled={
+            !(
+              isOnInclusiveUnitInterval(+betState.betInputValue) &&
+              +betState.betInputValue >= ante
+            )
+          }
+          onClick={this.onPlaceBetClick}
+        >
+          Place bet
+        </button>
+      </section>
+    );
+  }
+
+  renderFollowingBetMenu(betState: FollowingBetState): React.ReactElement {
+    const initialBet = betState.opponentInitialBet;
+    return (
+      <section>
+        <h3>You are betting second.</h3>
+        <label className="BetMenuLabel">Strength: {betState.strength}</label>
+        <label className="BetMenuLabel">Opponent's bet: {initialBet}</label>
+        <label className="BetMenuLabel">
+          Your bet:{" "}
+          <input
+            className={
+              isOnInclusiveUnitInterval(+betState.betInputValue) &&
+              +betState.betInputValue >= initialBet
+                ? ""
+                : "InvalidInput"
+            }
+            type="text"
+            value={betState.betInputValue}
+            onChange={this.onBetInputValueChange}
+          />
+          <input
+            className={
+              isOnInclusiveUnitInterval(+betState.betInputValue) &&
+              +betState.betInputValue >= initialBet
+                ? ""
+                : "InvalidInput"
+            }
+            type="range"
+            min={initialBet}
+            max={1}
+            step={0.001}
+            value={+betState.betInputValue}
+            onChange={this.onBetInputValueChange}
+          />
+        </label>
+
+        <button
+          disabled={
+            !(
+              isOnInclusiveUnitInterval(+betState.betInputValue) &&
+              +betState.betInputValue >= initialBet
+            )
+          }
+          onClick={this.onPlaceBetClick}
+        >
+          Place bet
+        </button>
+        <button onClick={this.onFoldClick}>Fold</button>
+      </section>
+    );
+  }
+
+  renderMaxBetMenu(betState: MaxBetState): React.ReactElement {
+    return (
+      <section>
+        <h3>Your opponent raised.</h3>
+        <label className="BetMenuLabel">Strength: {betState.strength}</label>
+        <label className="BetMenuLabel">
+          Your initial bet: {betState.initialBet}
+        </label>
+        <label className="BetMenuLabel">
+          Opponent's bet: {betState.followingBet}
+        </label>
+
+        <button onClick={this.onPlaceBetClick}>Call</button>
+        <button onClick={this.onFoldClick}>Fold</button>
+      </section>
+    );
   }
 
   renderGraphMenu(state: GraphState): React.ReactElement {
@@ -1126,7 +1401,24 @@ export default class App extends React.Component<{}, AppState> {
   }
 
   onPlayClick(): void {
-    // TODO
+    const { state } = this;
+    const namedOpponent = state.agents[0];
+    const { ante } = state.options.trainingCycleOptions.evaluationOptions;
+
+    const newState: PlayState = {
+      stateType: StateType.Play,
+
+      agents: state.agents,
+      options: state.options,
+
+      opponentName: namedOpponent.name,
+      reward: 0,
+      hands: 0,
+
+      betState: getRandomBetState(namedOpponent.agent, ante),
+      acknowledgeable: undefined,
+    };
+    this.setState(newState);
   }
 
   onGraphClick(): void {
@@ -1640,6 +1932,231 @@ export default class App extends React.Component<{}, AppState> {
     this.setState(newState);
   }
 
+  onOpponentNameChange(event: React.ChangeEvent<HTMLSelectElement>): void {
+    const state = this.expectState(StateType.Play);
+    const newOpponentName = event.target.value;
+
+    if (state.opponentName === newOpponentName) {
+      return;
+    }
+
+    const opponent = getAgent(state.agents, newOpponentName);
+    const { ante } = state.options.trainingCycleOptions.evaluationOptions;
+
+    const newState: PlayState = {
+      stateType: StateType.Play,
+
+      agents: state.agents,
+      options: state.options,
+
+      opponentName: newOpponentName,
+      reward: 0,
+      hands: 0,
+      betState: getRandomBetState(opponent, ante),
+      acknowledgeable: undefined,
+    };
+    this.setState(newState);
+  }
+
+  onBetInputValueChange(event: React.ChangeEvent<HTMLInputElement>): void {
+    const state = this.expectState(StateType.Play);
+
+    if (state.betState.betStateType === BetStateType.Max) {
+      throw new Error(
+        "Impossible: state.betState.betInputValue does not exist on MaxBetState, and therefore cannot be changed."
+      );
+    }
+
+    const newState: PlayState = {
+      ...state,
+      betState: { ...state.betState, betInputValue: event.target.value },
+    };
+    this.setState(newState);
+  }
+
+  onPlaceBetClick(): void {
+    const state = this.expectState(StateType.Play);
+    const { betState } = state;
+
+    switch (betState.betStateType) {
+      case BetStateType.Initial:
+        this.placeInitialBet(state, betState);
+        break;
+
+      case BetStateType.Following:
+        this.placeFollowingBet(state, betState);
+        break;
+
+      case BetStateType.Max:
+        this.callFollowingBet(state, betState);
+        break;
+    }
+  }
+
+  placeInitialBet(state: PlayState, betState: InitialBetState): void {
+    const opponent = getAgent(state.agents, state.opponentName);
+    const { ante } = state.options.trainingCycleOptions.evaluationOptions;
+
+    const initialBet = +betState.betInputValue;
+    const { opponentStrength } = betState;
+    const followingBet = Math.max(
+      ante,
+      opponent.follow(opponentStrength, initialBet, Math.random())
+    );
+    if (followingBet > initialBet) {
+      const maxBetState: MaxBetState = {
+        betStateType: BetStateType.Max,
+
+        strength: betState.strength,
+        opponentStrength,
+        initialBet,
+        followingBet,
+      };
+      const newState: PlayState = {
+        ...state,
+        betState: maxBetState,
+      };
+      this.setState(newState);
+    } else if (followingBet < initialBet) {
+      const newState: PlayState = {
+        ...state,
+        betState: getRandomBetState(opponent, ante),
+        reward: state.reward + ante,
+        hands: state.hands + 1,
+        acknowledgeable: {
+          acknowledgeableType: GameAcknowledgeableType.Fold,
+          reward: ante,
+        },
+      };
+      this.setState(newState);
+    } else {
+      this.showdown(state, betState, initialBet);
+    }
+  }
+
+  showdown(state: PlayState, betState: BetState, usedBet: number): void {
+    const opponent = getAgent(state.agents, state.opponentName);
+    const { ante } = state.options.trainingCycleOptions.evaluationOptions;
+    const { strength: userStrength, opponentStrength } = betState;
+
+    if (userStrength > opponentStrength) {
+      const newState: PlayState = {
+        ...state,
+        betState: getRandomBetState(opponent, ante),
+        reward: state.reward + usedBet,
+        hands: state.hands + 1,
+        acknowledgeable: {
+          acknowledgeableType: GameAcknowledgeableType.Showdown,
+          strength: userStrength,
+          opponentStrength,
+          reward: usedBet,
+        },
+      };
+      this.setState(newState);
+    } else if (userStrength < opponentStrength) {
+      const newState: PlayState = {
+        ...state,
+        betState: getRandomBetState(opponent, ante),
+        reward: state.reward - usedBet,
+        hands: state.hands + 1,
+        acknowledgeable: {
+          acknowledgeableType: GameAcknowledgeableType.Showdown,
+          strength: userStrength,
+          opponentStrength,
+          reward: -usedBet,
+        },
+      };
+      this.setState(newState);
+    } else {
+      const newState: PlayState = {
+        ...state,
+        betState: getRandomBetState(opponent, ante),
+        reward: state.reward,
+        hands: state.hands + 1,
+        acknowledgeable: {
+          acknowledgeableType: GameAcknowledgeableType.Showdown,
+          strength: userStrength,
+          opponentStrength,
+          reward: 0,
+        },
+      };
+      this.setState(newState);
+    }
+  }
+
+  placeFollowingBet(state: PlayState, betState: FollowingBetState): void {
+    const followingBet = +betState.betInputValue;
+
+    if (followingBet < betState.opponentInitialBet) {
+      const { ante } = state.options.trainingCycleOptions.evaluationOptions;
+      this.fold(state, ante);
+      return;
+    }
+
+    const { opponentMaxBet } = betState;
+    const opponent = getAgent(state.agents, state.opponentName);
+    const { ante } = state.options.trainingCycleOptions.evaluationOptions;
+    if (followingBet > opponentMaxBet) {
+      const newState: PlayState = {
+        ...state,
+        betState: getRandomBetState(opponent, ante),
+        hands: state.hands + 1,
+        reward: state.reward + ante,
+        acknowledgeable: {
+          acknowledgeableType: GameAcknowledgeableType.Fold,
+          reward: ante,
+        },
+      };
+      this.setState(newState);
+    } else {
+      this.showdown(state, betState, followingBet);
+    }
+  }
+
+  callFollowingBet(state: PlayState, betState: MaxBetState): void {
+    this.showdown(state, betState, betState.followingBet);
+  }
+
+  onFoldClick(): void {
+    const state = this.expectState(StateType.Play);
+    const { betState } = state;
+    const { ante } = state.options.trainingCycleOptions.evaluationOptions;
+    switch (betState.betStateType) {
+      case BetStateType.Initial:
+        throw new Error("Impossible: Cannot fold during InitialBetState");
+      case BetStateType.Following:
+        this.fold(state, ante);
+        break;
+      case BetStateType.Max:
+        this.fold(state, betState.initialBet);
+        break;
+    }
+  }
+
+  fold(state: PlayState, forfeitedBet: number): void {
+    const opponent = getAgent(state.agents, state.opponentName);
+    const { ante } = state.options.trainingCycleOptions.evaluationOptions;
+
+    const newState: PlayState = {
+      ...state,
+
+      hands: state.hands + 1,
+      reward: state.reward - forfeitedBet,
+      betState: getRandomBetState(opponent, ante),
+      acknowledgeable: {
+        acknowledgeableType: GameAcknowledgeableType.Fold,
+        reward: -forfeitedBet,
+      },
+    };
+    this.setState(newState);
+  }
+
+  onAcknowledgeClick(): void {
+    const state = this.expectState(StateType.Play);
+    const newState: PlayState = { ...state, acknowledgeable: undefined };
+    this.setState(newState);
+  }
+
   onGraphedAgentNameChange(event: React.ChangeEvent<HTMLSelectElement>): void {
     const state = this.expectState(StateType.Graph);
     const newState: GraphState = {
@@ -1846,6 +2363,43 @@ function immutSetElement<T>(src: readonly T[], index: number, item: T): T[] {
   const clone = src.slice();
   clone[index] = item;
   return clone;
+}
+
+function getRandomBetState(opponent: Agent, ante: number): BetState {
+  if (Math.random() > 0.5) {
+    return getRandomInitialBetState(ante);
+  } else {
+    return getRandomFollowingBetState(opponent, ante);
+  }
+}
+
+function getRandomInitialBetState(ante: number): InitialBetState {
+  return {
+    betStateType: BetStateType.Initial,
+    strength: Math.random(),
+    opponentStrength: Math.random(),
+    betInputValue: Math.max(ante, DEFAULT_BET).toFixed(DISPLAYED_DECIMALS),
+  };
+}
+
+function getRandomFollowingBetState(
+  opponent: Agent,
+  ante: number
+): FollowingBetState {
+  const opponentStrength = Math.random();
+  const opponentBets = opponent.lead(opponentStrength, Math.random());
+  const opponentInitialBet = Math.max(ante, opponentBets[0]);
+  const opponentMaxBet = Math.max(opponentInitialBet, opponentBets[1]);
+  return {
+    betStateType: BetStateType.Following,
+    strength: Math.random(),
+    opponentStrength,
+    opponentInitialBet,
+    opponentMaxBet,
+    betInputValue: Math.max(opponentInitialBet, DEFAULT_BET).toFixed(
+      DISPLAYED_DECIMALS
+    ),
+  };
 }
 
 function noOp(): void {}

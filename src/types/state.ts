@@ -161,6 +161,7 @@ export interface PlayState {
   hands: number;
 
   betState: BetState;
+  acknowledgeable: undefined | GameAcknowledgeable;
 }
 
 export type BetState = InitialBetState | FollowingBetState | MaxBetState;
@@ -175,6 +176,7 @@ export interface InitialBetState {
   betStateType: BetStateType.Initial;
 
   strength: number;
+  opponentStrength: number;
   betInputValue: string;
 }
 
@@ -182,7 +184,9 @@ export interface FollowingBetState {
   betStateType: BetStateType.Following;
 
   strength: number;
-  initialBet: number;
+  opponentStrength: number;
+  opponentInitialBet: number;
+  opponentMaxBet: number;
   betInputValue: string;
 }
 
@@ -190,9 +194,30 @@ export interface MaxBetState {
   betStateType: BetStateType.Max;
 
   strength: number;
+  opponentStrength: number;
   initialBet: number;
   followingBet: number;
-  betInputValue: string;
+}
+
+export type GameAcknowledgeable = Showdown | Fold;
+
+export enum GameAcknowledgeableType {
+  Showdown,
+  Fold,
+}
+
+export interface Showdown {
+  acknowledgeableType: GameAcknowledgeableType.Showdown;
+
+  strength: number;
+  opponentStrength: number;
+  reward: number;
+}
+
+export interface Fold {
+  acknowledgeableType: GameAcknowledgeableType.Fold;
+
+  reward: number;
 }
 
 export interface GraphState {
