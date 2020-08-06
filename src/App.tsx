@@ -13,6 +13,7 @@ import { DaikonCreationOptions } from "./agents/daikon";
 import { FigCreationOptions } from "./agents/fig";
 import { GrapeCreationOptions } from "./agents/grape";
 import { HabaneroCreationOptions } from "./agents/habanero";
+import { IlamaCreationOptions } from "./agents/ilama";
 import "./App.css";
 import * as arraySet from "./arraySet";
 import { Agent } from "./game/types";
@@ -548,6 +549,35 @@ export default class App extends React.Component<{}, AppState> {
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   this.changeAgentCreationOptionInputValue(
                     "hiddenLayerSize",
+                    event.target.value
+                  )
+                }
+              />
+            </label>
+          </section>
+        );
+      }
+
+      case AgentType.Ilama: {
+        const inputValues = state.agentCreationOptionInputValues as WithStringValues<
+          IlamaCreationOptions
+        >;
+        return (
+          <section>
+            <h3>Agent options</h3>
+            <label>
+              Minimum playable strength:{" "}
+              <input
+                className={
+                  isOnInclusiveUnitInterval(+inputValues.minStrength)
+                    ? ""
+                    : "InvalidInput"
+                }
+                type="text"
+                value={inputValues.minStrength}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  this.changeAgentCreationOptionInputValue(
+                    "minStrength",
                     event.target.value
                   )
                 }

@@ -85,11 +85,12 @@ Below is a list of agents and their betting policies:
 - Fig - A variation of Artichoke that trains its networks independently (Artichoke trains its networks sequentially, so updates in the first network would affect the training of the second network).
 - Grape - A variation of Fig that normalizes its inputs around a mean of `0`.
 - Habanero - A variation of Grape that uses the sigmoid activation function in its hidden layer instead of ReLU.
+- Ilama - Almost like Broccoli, except it automatically folds (i.e., bets `0`) if its hand strength is less than a user-specified threshold.
 
 Agent source code can be found in [src/agents](./src/agents/).
 
 Feel free to add your own agents and open a pull request.
-Please adhere to the alphabetical vegetable naming convention.
+Please adhere to the alphabetical fruit/vegetable naming convention.
 
 ## License
 

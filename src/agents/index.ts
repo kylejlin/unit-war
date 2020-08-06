@@ -39,6 +39,11 @@ import {
   areHabaneroCreationOptionsValid,
   HabaneroCreationOptions,
 } from "./habanero";
+import {
+  AgentIlama,
+  areIlamaOptionsValid,
+  IlamaCreationOptions,
+} from "./ilama";
 
 export enum AgentType {
   Artichoke = 1,
@@ -49,6 +54,7 @@ export enum AgentType {
   Fig = 6,
   Grape = 7,
   Habanero = 8,
+  Ilama = 9,
 }
 
 export type AgentCreationOptions =
@@ -59,7 +65,8 @@ export type AgentCreationOptions =
   | EggplantCreationOptions
   | FigCreationOptions
   | GrapeCreationOptions
-  | HabaneroCreationOptions;
+  | HabaneroCreationOptions
+  | IlamaCreationOptions;
 
 export const ALL_AGENT_TYPES: AgentType[] = [
   AgentType.Artichoke,
@@ -70,6 +77,7 @@ export const ALL_AGENT_TYPES: AgentType[] = [
   AgentType.Fig,
   AgentType.Grape,
   AgentType.Habanero,
+  AgentType.Ilama,
 ];
 
 export function deserializeAgent(buffer: ArrayBuffer): Agent {
@@ -107,6 +115,8 @@ function deserializeAgentOfType(
       return AgentGrape.fromArrayBuffer(buffer);
     case AgentType.Habanero:
       return AgentHabanero.fromArrayBuffer(buffer);
+    case AgentType.Ilama:
+      return AgentIlama.fromArrayBuffer(buffer);
   }
 }
 
@@ -147,6 +157,10 @@ export function createAgent(
       return AgentHabanero.fromCreationOptions(
         creationOptions as HabaneroCreationOptions
       );
+    case AgentType.Ilama:
+      return AgentIlama.fromCreationOptions(
+        creationOptions as IlamaCreationOptions
+      );
   }
 }
 
@@ -168,6 +182,8 @@ export function getAgentTypeDisplayString(agentType: AgentType): string {
       return "Grape [Neural Network]";
     case AgentType.Habanero:
       return "Habanero [Neural Network]";
+    case AgentType.Ilama:
+      return "Ilama [Tighter Random]";
   }
 }
 
@@ -191,6 +207,8 @@ export function getDefaultAgentCreationOptions(
       return { hiddenLayerSize: 16 };
     case AgentType.Habanero:
       return { hiddenLayerSize: 16 };
+    case AgentType.Ilama:
+      return { minStrength: 0.4 };
   }
 }
 
@@ -219,6 +237,8 @@ export function areAgentCreationOptionsValid(
       return areHabaneroCreationOptionsValid(
         options as HabaneroCreationOptions
       );
+    case AgentType.Ilama:
+      return areIlamaOptionsValid(options as IlamaCreationOptions);
   }
 }
 
